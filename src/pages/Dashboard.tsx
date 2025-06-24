@@ -1,15 +1,17 @@
 
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calculator, TrendingUp, DollarSign, FileText, Users, AlertTriangle, BarChart3, Settings } from "lucide-react";
+import { Calculator, TrendingUp, DollarSign, FileText, Users, AlertTriangle, BarChart3, Settings, Shield, Building, BookOpen, RefreshCw } from "lucide-react";
 import ActuarialEngine from "../components/ActuarialEngine";
 import PricingSystem from "../components/PricingSystem";
 import AccountingModule from "../components/AccountingModule";
 import ClaimsModule from "../components/ClaimsModule";
 import TreatyManagement from "../components/TreatyManagement";
+import UnderwritingModule from "../components/UnderwritingModule";
+import IfrsReporting from "../components/IfrsReporting";
+import RetrocessionModule from "../components/RetrocessionModule";
 
 const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("dashboard");
@@ -39,6 +41,12 @@ const Dashboard = () => {
         return <ClaimsModule />;
       case "treaties":
         return <TreatyManagement />;
+      case "underwriting":
+        return <UnderwritingModule />;
+      case "ifrs":
+        return <IfrsReporting />;
+      case "retrocession":
+        return <RetrocessionModule />;
       default:
         return (
           <div className="space-y-6">
@@ -71,21 +79,25 @@ const Dashboard = () => {
                   <CardDescription>Common tasks and operations</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button onClick={() => setActiveModule("actuarial")} className="w-full justify-start">
+                  <Button onClick={() => setActiveModule("underwriting")} className="w-full justify-start">
+                    <Building className="mr-2 h-4 w-4" />
+                    New Underwriting Contract
+                  </Button>
+                  <Button onClick={() => setActiveModule("actuarial")} variant="outline" className="w-full justify-start">
                     <Calculator className="mr-2 h-4 w-4" />
                     Run Actuarial Calculations
                   </Button>
                   <Button onClick={() => setActiveModule("pricing")} variant="outline" className="w-full justify-start">
                     <TrendingUp className="mr-2 h-4 w-4" />
-                    Generate Treaty Pricing
+                    Generate AI Pricing
                   </Button>
                   <Button onClick={() => setActiveModule("claims")} variant="outline" className="w-full justify-start">
                     <FileText className="mr-2 h-4 w-4" />
                     Process New Claim
                   </Button>
-                  <Button onClick={() => setActiveModule("accounting")} variant="outline" className="w-full justify-start">
-                    <DollarSign className="mr-2 h-4 w-4" />
-                    View Financial Reports
+                  <Button onClick={() => setActiveModule("ifrs")} variant="outline" className="w-full justify-start">
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    Generate IFRS 17 Report
                   </Button>
                 </CardContent>
               </Card>
@@ -155,7 +167,7 @@ const Dashboard = () => {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">AfriReVision Platform</h1>
-                <p className="text-sm text-gray-600">Reinsurance Management System</p>
+                <p className="text-sm text-gray-600">Complete Reinsurance Management System</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -172,19 +184,22 @@ const Dashboard = () => {
       {/* Navigation */}
       <nav className="bg-white border-b">
         <div className="px-6">
-          <div className="flex space-x-8">
+          <div className="flex space-x-8 overflow-x-auto">
             {[
               { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="h-4 w-4" /> },
+              { id: 'underwriting', label: 'Underwriting', icon: <Building className="h-4 w-4" /> },
               { id: 'actuarial', label: 'Actuarial Engine', icon: <Calculator className="h-4 w-4" /> },
               { id: 'pricing', label: 'AI Pricing', icon: <TrendingUp className="h-4 w-4" /> },
               { id: 'accounting', label: 'Accounting', icon: <DollarSign className="h-4 w-4" /> },
               { id: 'claims', label: 'Claims', icon: <FileText className="h-4 w-4" /> },
-              { id: 'treaties', label: 'Treaties', icon: <Users className="h-4 w-4" /> }
+              { id: 'treaties', label: 'Treaties', icon: <Users className="h-4 w-4" /> },
+              { id: 'retrocession', label: 'Retrocession', icon: <Shield className="h-4 w-4" /> },
+              { id: 'ifrs', label: 'IFRS 17', icon: <BookOpen className="h-4 w-4" /> }
             ].map((item) => (
               <button
                 key={item.id}
                 onClick={() => setActiveModule(item.id)}
-                className={`flex items-center space-x-2 px-3 py-4 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center space-x-2 px-3 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeModule === item.id
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
