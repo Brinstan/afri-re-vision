@@ -8,11 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, FileText, Plus, Download, AlertTriangle, DollarSign, Calendar, Upload, Eye, Edit, CheckCircle } from "lucide-react";
-import { useAuth } from './AuthContext';
+import { Search, FileText, Plus, Download, AlertTriangle, DollarSign, Calendar, Upload, Eye, Edit } from "lucide-react";
 
 const ClaimsModuleComprehensive = () => {
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("new-claim");
   const [claimType, setClaimType] = useState("");
   const [contractNumber, setContractNumber] = useState("");
@@ -209,15 +207,14 @@ const ClaimsModuleComprehensive = () => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Comprehensive Claims Management</h2>
-          <p className="text-gray-600">Advanced claims processing with standardized numbering and accounting integration</p>
+          <p className="text-gray-600">Advanced claims processing with standardized numbering</p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="new-claim">New Claim</TabsTrigger>
           <TabsTrigger value="approved-claims">Approved Claims</TabsTrigger>
-          <TabsTrigger value="accounting">Accounting</TabsTrigger>
           <TabsTrigger value="inward-claims">Inward Claims</TabsTrigger>
           <TabsTrigger value="outstanding-claims">Outstanding Claims</TabsTrigger>
           <TabsTrigger value="retro-section">Retro Section</TabsTrigger>
@@ -547,124 +544,6 @@ const ClaimsModuleComprehensive = () => {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="accounting" className="space-y-4">
-          {user?.userType === 'Finance' ? (
-            <Tabs defaultValue="manage-claims" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="manage-claims">Manage Claims</TabsTrigger>
-                <TabsTrigger value="commissions">Commissions</TabsTrigger>
-                <TabsTrigger value="receivables">Receivables</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="manage-claims" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Claims Management - Finance View</CardTitle>
-                    <CardDescription>Finance team access to approved claims for payment processing</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="border rounded-lg">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Claim Reference</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>Documents</TableHead>
-                            <TableHead>Payment Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {approvedClaims.map((claim) => (
-                            <TableRow key={claim.claimNumber}>
-                              <TableCell className="font-mono text-sm">{claim.claimNumber}</TableCell>
-                              <TableCell>{claim.currency} {claim.claimAmount.toLocaleString()}</TableCell>
-                              <TableCell>
-                                <div className="flex space-x-1">
-                                  <Button size="sm" variant="outline">
-                                    <Download className="h-3 w-3 mr-1" />
-                                    Claim Advice
-                                  </Button>
-                                  <Button size="sm" variant="outline">
-                                    <Download className="h-3 w-3 mr-1" />
-                                    Payment Voucher
-                                  </Button>
-                                  <Button size="sm" variant="outline">
-                                    <Download className="h-3 w-3 mr-1" />
-                                    Debit Note
-                                  </Button>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Select defaultValue={claim.status}>
-                                  <SelectTrigger className="w-32">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="No Payment Made">No Payment</SelectItem>
-                                    <SelectItem value="Partial Payment">Partial</SelectItem>
-                                    <SelectItem value="Full Payment">Full Payment</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex space-x-1">
-                                  <Button size="sm">
-                                    <DollarSign className="h-3 w-3 mr-1" />
-                                    Record Payment
-                                  </Button>
-                                  <Button size="sm" variant="outline">
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Update Status
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="commissions" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Commission Management</CardTitle>
-                    <CardDescription>Manage broker commissions and payments</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-600">Commission management interface for finance team...</p>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="receivables" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Receivables Management</CardTitle>
-                    <CardDescription>Track and manage outstanding receivables</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-600">Receivables tracking interface for finance team...</p>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Access Restricted</CardTitle>
-                <CardDescription>This section is only available to Finance users</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">Please contact your system administrator for access to accounting features.</p>
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
         <TabsContent value="inward-claims" className="space-y-4">
