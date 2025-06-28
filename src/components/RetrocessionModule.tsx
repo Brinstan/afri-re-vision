@@ -6,7 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Shield, TrendingDown, RefreshCw, Plus, Eye } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Shield, TrendingDown, RefreshCw, Plus, Eye, Search, Download } from "lucide-react";
 
 const RetrocessionModule = () => {
   const [autoAllocation, setAutoAllocation] = useState(true);
@@ -24,12 +26,42 @@ const RetrocessionModule = () => {
     { treatyId: "MAR-2024-003", treatyType: "Marine Treaty", gross: "12,200,000", retroCeded: "3,050,000", net: "9,150,000", allocation: 75 }
   ];
 
+  const retroTreaties = [
+    {
+      outwardPolicyNumber: "OUT-2024-001",
+      underwritingYear: "2024",
+      treatyName: "Cat XOL Retro Cover",
+      reinsurer: "Swiss Re",
+      coverage: "250M xs 50M",
+      premium: 12500000,
+      commission: 15.0
+    },
+    {
+      outwardPolicyNumber: "OUT-2024-002", 
+      underwritingYear: "2024",
+      treatyName: "Quota Share Retro",
+      reinsurer: "Munich Re",
+      coverage: "25% of Portfolio",
+      premium: 28750000,
+      commission: 20.0
+    },
+    {
+      outwardPolicyNumber: "OUT-2024-003",
+      underwritingYear: "2024", 
+      treatyName: "Working XOL Retro",
+      reinsurer: "Lloyd's Syndicate",
+      coverage: "5M xs 2M",
+      premium: 6500000,
+      commission: 12.5
+    }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Retrocession Management</h2>
-          <p className="text-gray-600">Automatic retrocession allocation and portfolio protection</p>
+          <p className="text-gray-600">Comprehensive retrocession allocation and portfolio protection</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline">
@@ -91,174 +123,332 @@ const RetrocessionModule = () => {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Retrocession Program Structure</CardTitle>
-            <CardDescription>Company's retrocession protection layers</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {retroProgram.map((cover) => (
-                <div key={cover.id} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h4 className="font-medium">{cover.type}</h4>
-                      <p className="text-sm text-gray-600">{cover.layer}</p>
-                    </div>
-                    <Badge variant="secondary">
-                      {cover.attachment > 0 ? `${cover.attachment}% Attachment` : 'Working Layer'}
-                    </Badge>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 mb-3">
-                    <div>
-                      <p className="text-xs text-gray-500">Annual Premium</p>
-                      <p className="font-medium">USD {parseInt(cover.premium).toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Coverage Lines</p>
-                      <div className="flex flex-wrap gap-1">
-                        {cover.coverage.map((line, idx) => (
-                          <Badge key={idx} variant="outline" className="text-xs">
-                            {line}
-                          </Badge>
-                        ))}
+      <Tabs defaultValue="program-structure" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="program-structure">Program Structure</TabsTrigger>
+          <TabsTrigger value="new-outward">New Outward</TabsTrigger>
+          <TabsTrigger value="outward-display">Outward Display</TabsTrigger>
+          <TabsTrigger value="configuration">Configuration</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="program-structure" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Retrocession Program Structure</CardTitle>
+                <CardDescription>Company's retrocession protection layers</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {retroProgram.map((cover) => (
+                    <div key={cover.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h4 className="font-medium">{cover.type}</h4>
+                          <p className="text-sm text-gray-600">{cover.layer}</p>
+                        </div>
+                        <Badge variant="secondary">
+                          {cover.attachment > 0 ? `${cover.attachment}% Attachment` : 'Working Layer'}
+                        </Badge>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 mb-3">
+                        <div>
+                          <p className="text-xs text-gray-500">Annual Premium</p>
+                          <p className="font-medium">USD {parseInt(cover.premium).toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Coverage Lines</p>
+                          <div className="flex flex-wrap gap-1">
+                            {cover.coverage.map((line, idx) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {line}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs">
+                          <span>Utilization</span>
+                          <span>{Math.round(Math.random() * 40 + 30)}%</span>
+                        </div>
+                        <Progress value={Math.round(Math.random() * 40 + 30)} className="h-2" />
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span>Utilization</span>
-                      <span>{Math.round(Math.random() * 40 + 30)}%</span>
-                    </div>
-                    <Progress value={Math.round(Math.random() * 40 + 30)} className="h-2" />
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Automatic Treaty Allocation</CardTitle>
-            <CardDescription>Real-time allocation of cedant treaties to retrocession</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                <span className="text-sm font-medium text-blue-900">Auto-Allocation Status</span>
-                <Badge className={autoAllocation ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                  {autoAllocation ? "ACTIVE" : "INACTIVE"}
-                </Badge>
+            <Card>
+              <CardHeader>
+                <CardTitle>Automatic Treaty Allocation</CardTitle>
+                <CardDescription>Real-time allocation of cedant treaties to retrocession</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <span className="text-sm font-medium text-blue-900">Auto-Allocation Status</span>
+                    <Badge className={autoAllocation ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                      {autoAllocation ? "ACTIVE" : "INACTIVE"}
+                    </Badge>
+                  </div>
+
+                  {treatyAllocations.map((treaty) => (
+                    <div key={treaty.treatyId} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h4 className="font-medium">{treaty.treatyId}</h4>
+                          <p className="text-sm text-gray-600">{treaty.treatyType}</p>
+                        </div>
+                        <Button size="sm" variant="outline">
+                          <Eye className="h-3 w-3 mr-1" />
+                          Details
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3 mb-3">
+                        <div>
+                          <p className="text-xs text-gray-500">Gross Premium</p>
+                          <p className="font-medium text-sm">USD {parseInt(treaty.gross).toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Retro Ceded</p>
+                          <p className="font-medium text-sm">USD {parseInt(treaty.retroCeded).toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Net Retained</p>
+                          <p className="font-medium text-sm">USD {parseInt(treaty.net).toLocaleString()}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs">
+                          <span>Net Retention Ratio</span>
+                          <span>{treaty.allocation}%</span>
+                        </div>
+                        <Progress value={treaty.allocation} className="h-2" />
+                      </div>
+
+                      <div className="mt-3 text-xs text-gray-600">
+                        <p>✓ Automatically allocated to retrocession covers based on program structure</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="new-outward" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>New Outward Retrocession</CardTitle>
+              <CardDescription>Create new outward retrocession arrangements</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="retroType">Retrocession Type</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="quota-share">Quota Share</SelectItem>
+                      <SelectItem value="surplus">Surplus</SelectItem>
+                      <SelectItem value="xol">Excess of Loss</SelectItem>
+                      <SelectItem value="cat-xol">Catastrophe XOL</SelectItem>
+                      <SelectItem value="stop-loss">Stop Loss</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reinsurer">Reinsurer</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select reinsurer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="swiss-re">Swiss Re</SelectItem>
+                      <SelectItem value="munich-re">Munich Re</SelectItem>
+                      <SelectItem value="lloyds">Lloyd's of London</SelectItem>
+                      <SelectItem value="hannover-re">Hannover Re</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              {treatyAllocations.map((treaty) => (
-                <div key={treaty.treatyId} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h4 className="font-medium">{treaty.treatyId}</h4>
-                      <p className="text-sm text-gray-600">{treaty.treatyType}</p>
-                    </div>
-                    <Button size="sm" variant="outline">
-                      <Eye className="h-3 w-3 mr-1" />
-                      Details
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 mb-3">
-                    <div>
-                      <p className="text-xs text-gray-500">Gross Premium</p>
-                      <p className="font-medium text-sm">USD {parseInt(treaty.gross).toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Retro Ceded</p>
-                      <p className="font-medium text-sm">USD {parseInt(treaty.retroCeded).toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Net Retained</p>
-                      <p className="font-medium text-sm">USD {parseInt(treaty.net).toLocaleString()}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span>Net Retention Ratio</span>
-                      <span>{treaty.allocation}%</span>
-                    </div>
-                    <Progress value={treaty.allocation} className="h-2" />
-                  </div>
-
-                  <div className="mt-3 text-xs text-gray-600">
-                    <p>✓ Automatically allocated to retrocession covers based on program structure</p>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="limit">Limit</Label>
+                  <Input id="limit" type="number" placeholder="0" />
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                <div className="space-y-2">
+                  <Label htmlFor="retention">Retention</Label>
+                  <Input id="retention" type="number" placeholder="0" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="premium">Premium</Label>
+                  <Input id="premium" type="number" placeholder="0" />
+                </div>
+              </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Retrocession Configuration</CardTitle>
-          <CardDescription>Configure automatic allocation rules and thresholds</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="allocationMethod">Allocation Method</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select method" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="proportional">Proportional</SelectItem>
-                  <SelectItem value="priority">Priority Based</SelectItem>
-                  <SelectItem value="risk-based">Risk Based</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="commission">Commission %</Label>
+                  <Input id="commission" type="number" step="0.01" placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="inceptionDate">Inception Date</Label>
+                  <Input id="inceptionDate" type="date" />
+                </div>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="autoThreshold">Auto Allocation Threshold</Label>
-              <Input id="autoThreshold" type="number" placeholder="1000000" />
-            </div>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Outward Treaty
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <div className="space-y-2">
-              <Label htmlFor="maxRetention">Maximum Net Retention %</Label>
-              <Input id="maxRetention" type="number" placeholder="75" />
-            </div>
+        <TabsContent value="outward-display" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Outward Policy Display</CardTitle>
+              <CardDescription>Search and view all retrocession cession treaties</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="outwardPolicyNumber">Outward Policy Number</Label>
+                  <Input
+                    id="outwardPolicyNumber"
+                    placeholder="e.g., OUT-2024-001"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="outwardYear">Underwriting Year</Label>
+                  <Input
+                    id="outwardYear"
+                    placeholder="e.g., 2024"
+                  />
+                </div>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="reinstatement">Reinstatement Handling</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select option" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="automatic">Automatic</SelectItem>
-                  <SelectItem value="manual">Manual Review</SelectItem>
-                  <SelectItem value="conditional">Conditional</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+              <Button>
+                <Search className="h-4 w-4 mr-2" />
+                Search Retro Treaties
+              </Button>
 
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-medium mb-2">Automatic Allocation Rules</h4>
-            <div className="space-y-1 text-sm text-gray-600">
-              <p>• All new treaties automatically allocated to retrocession covers upon binding</p>
-              <p>• Claims automatically trigger retrocession recoveries based on treaty structure</p>
-              <p>• Real-time net retention monitoring with automated alerts for threshold breaches</p>
-              <p>• Proportional allocation across multiple retro covers based on coverage limits</p>
-              <p>• IFRS 17 impact automatically calculated and reflected in financial reporting</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              <div className="border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Policy Number</TableHead>
+                      <TableHead>Treaty Name</TableHead>
+                      <TableHead>Reinsurer</TableHead>
+                      <TableHead>Coverage</TableHead>
+                      <TableHead>Premium</TableHead>
+                      <TableHead>Commission</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {retroTreaties.map((treaty) => (
+                      <TableRow key={treaty.outwardPolicyNumber}>
+                        <TableCell className="font-medium">{treaty.outwardPolicyNumber}</TableCell>
+                        <TableCell>{treaty.treatyName}</TableCell>
+                        <TableCell>{treaty.reinsurer}</TableCell>
+                        <TableCell>{treaty.coverage}</TableCell>
+                        <TableCell>USD {treaty.premium.toLocaleString()}</TableCell>
+                        <TableCell>{treaty.commission}%</TableCell>
+                        <TableCell>
+                          <div className="flex space-x-1">
+                            <Button size="sm" variant="outline">
+                              <Eye className="h-3 w-3 mr-1" />
+                              View
+                            </Button>
+                            <Button size="sm" variant="outline">
+                              <Download className="h-3 w-3 mr-1" />
+                              Export
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="configuration" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Retrocession Configuration</CardTitle>
+              <CardDescription>Configure automatic allocation rules and thresholds</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="allocationMethod">Allocation Method</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="proportional">Proportional</SelectItem>
+                      <SelectItem value="priority">Priority Based</SelectItem>
+                      <SelectItem value="risk-based">Risk Based</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="autoThreshold">Auto Allocation Threshold</Label>
+                  <Input id="autoThreshold" type="number" placeholder="1000000" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="maxRetention">Maximum Net Retention %</Label>
+                  <Input id="maxRetention" type="number" placeholder="75" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="reinstatement">Reinstatement Handling</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select option" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="automatic">Automatic</SelectItem>
+                      <SelectItem value="manual">Manual Review</SelectItem>
+                      <SelectItem value="conditional">Conditional</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-medium mb-2">Automatic Allocation Rules</h4>
+                <div className="space-y-1 text-sm text-gray-600">
+                  <p>• All new treaties automatically allocated to retrocession covers upon binding</p>
+                  <p>• Claims automatically trigger retrocession recoveries based on treaty structure</p>
+                  <p>• Real-time net retention monitoring with automated alerts for threshold breaches</p>
+                  <p>• Proportional allocation across multiple retro covers based on coverage limits</p>
+                  <p>• IFRS 17 impact automatically calculated and reflected in financial reporting</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
