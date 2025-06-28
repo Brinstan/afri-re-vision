@@ -8,7 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, FileText, Plus, Download, AlertTriangle, DollarSign, Calendar, Upload, Eye, Edit } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { toast } from "@/components/ui/sonner";
+import { Search, FileText, Plus, Download, AlertTriangle, DollarSign, Calendar, Upload, Eye, Edit, Save, X, CheckCircle } from "lucide-react";
 
 const ClaimsModuleComprehensive = () => {
   const [activeTab, setActiveTab] = useState("new-claim");
@@ -21,6 +23,11 @@ const ClaimsModuleComprehensive = () => {
   const [currency, setCurrency] = useState("USD");
   const [searchClaimNumber, setSearchClaimNumber] = useState("");
   const [searchDateOfLoss, setSearchDateOfLoss] = useState("");
+  
+  // Edit claim states
+  const [editingClaim, setEditingClaim] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Generate standardized claim reference number
   const generateClaimReference = (type: string, businessClass: string) => {
@@ -44,9 +51,10 @@ const ClaimsModuleComprehensive = () => {
     return `TAN/${typeMap[type] || 'MV'}/${businessMap[businessClass] || 'TTY'}/${year}/${sequential}`;
   };
 
-  // Sample approved claims data
-  const approvedClaims = [
+  // Sample approved claims data with editable fields
+  const [approvedClaims, setApprovedClaims] = useState([
     {
+      id: 1,
       claimNumber: "TAN/MV/TTY/2024/0001",
       contractNumber: "12345",
       insuredName: "ABC Transport Ltd",
@@ -54,10 +62,14 @@ const ClaimsModuleComprehensive = () => {
       currency: "USD",
       status: "No Payment Made",
       dateApproved: "2024-12-15",
+      dateOfLoss: "2024-11-15",
+      claimDescription: "Vehicle collision resulting in total loss",
+      reserveAmount: 2500000,
       claimAdvice: null,
       paymentVoucher: null
     },
     {
+      id: 2,
       claimNumber: "TAN/F/FAC/2024/0002", 
       contractNumber: "12346",
       insuredName: "XYZ Manufacturing",
@@ -65,20 +77,45 @@ const ClaimsModuleComprehensive = () => {
       currency: "USD",
       status: "Partial Payment",
       dateApproved: "2024-12-10",
+      dateOfLoss: "2024-10-08",
+      claimDescription: "Fire damage to manufacturing equipment",
+      reserveAmount: 1800000,
       claimAdvice: "claim_advice_002.pdf",
       paymentVoucher: "payment_voucher_002.pdf"
     }
-  ];
+  ]);
 
-  // Sample treaty data for auto-linking
+  // Enhanced treaty data with detailed layer structure for XOL calculations
   const treatyData = {
     "12345": {
       treatyName: "Motor Treaty 2024",
       cedant: "Century Insurance Ltd",
       participationShare: 50,
       layers: [
-        { name: "Working Layer", limit: 5000000, retention: 0, reinstatementRate: 100 },
-        { name: "1st Excess", limit: 10000000, retention: 5000000, reinstatementRate: 100 }
+        { 
+          name: "Working Layer", 
+          limit: 5000000, 
+          retention: 0, 
+          reinstatementRate: 100,
+          deductible: 100000,
+          remainingCapacity: 5000000
+        },
+        { 
+          name: "1st Excess", 
+          limit: 10000000, 
+          retention: 5000000, 
+          reinstatementRate: 100,
+          deductible: 0,
+          remainingCapacity: 10000000
+        },
+        { 
+          name: "2nd Excess", 
+          limit: 15000000, 
+          retention: 15000000, 
+          reinstatementRate: 75,
+          deductible: 0,
+          remainingCapacity: 15000000
+        }
       ],
       deductible: 100000,
       retroPercentage: 25,
@@ -91,7 +128,22 @@ const ClaimsModuleComprehensive = () => {
       cedant: "National Insurance Corp",
       participationShare: 75,
       layers: [
-        { name: "Working Layer", limit: 10000000, retention: 0, reinstatementRate: 100 }
+        { 
+          name: "Working Layer", 
+          limit: 10000000, 
+          retention: 0, 
+          reinstatementRate: 100,
+          deductible: 250000,
+          remainingCapacity: 10000000
+        },
+        { 
+          name: "Cat Layer", 
+          limit: 25000000, 
+          retention: 10000000, 
+          reinstatementRate: 50,
+          deductible: 0,
+          remainingCapacity: 25000000
+        }
       ],
       deductible: 250000,
       retroPercentage: 30,
@@ -106,63 +158,155 @@ const ClaimsModuleComprehensive = () => {
     setShowClaimForm(true);
   };
 
-  const calculateReinstatement = () => {
+  // Enhanced XOL calculation with detailed layer breakdown
+  const calculateXOLLayerDistribution = () => {
     if (!contractNumber || !treatyData[contractNumber] || !claimAmount) return null;
 
     const treaty = treatyData[contractNumber];
-    const claim = parseFloat(claimAmount);
-    const deductible = treaty.deductible;
-    const netClaim = Math.max(0, claim - deductible);
+    const totalClaim = parseFloat(claimAmount);
+    const overallDeductible = treaty.deductible;
+    const netClaimAfterDeductible = Math.max(0, totalClaim - overallDeductible);
     
-    let reinstatements = [];
-    let remainingClaim = netClaim;
+    let layerDistribution = [];
+    let remainingClaim = netClaimAfterDeductible;
+    let totalReinstatement = 0;
+    let totalPayable = 0;
 
-    treaty.layers.forEach(layer => {
+    // Process each layer
+    treaty.layers.forEach((layer, index) => {
       if (remainingClaim > 0) {
-        const layerClaim = Math.min(remainingClaim, layer.limit);
-        const reinstatementAmount = (layerClaim * layer.reinstatementRate) / 100;
+        // Calculate claim amount hitting this layer
+        const layerClaimGross = Math.min(remainingClaim, layer.limit);
+        const layerDeductible = layer.deductible || 0;
+        const layerClaimNet = Math.max(0, layerClaimGross - layerDeductible);
         
-        reinstatements.push({
-          layer: layer.name,
-          claimAmount: layerClaim,
-          reinstatementAmount: reinstatementAmount
+        // Calculate reinstatement premium for this layer
+        const layerReinstatement = (layerClaimNet * layer.reinstatementRate) / 100;
+        
+        // Calculate payable amount for this layer
+        const layerPayable = (layerClaimNet * treaty.participationShare) / 100;
+        
+        // Calculate remaining capacity after this claim
+        const newRemainingCapacity = Math.max(0, layer.remainingCapacity - layerClaimNet);
+        
+        layerDistribution.push({
+          layerName: layer.name,
+          layerLimit: layer.limit,
+          layerRetention: layer.retention,
+          layerDeductible: layerDeductible,
+          claimAmountGross: layerClaimGross,
+          claimAmountNet: layerClaimNet,
+          reinstatementRate: layer.reinstatementRate,
+          reinstatementPremium: layerReinstatement,
+          payableAmount: layerPayable,
+          remainingCapacityBefore: layer.remainingCapacity,
+          remainingCapacityAfter: newRemainingCapacity,
+          utilizationPercentage: layer.remainingCapacity > 0 ? (layerClaimNet / layer.remainingCapacity) * 100 : 0
         });
         
-        remainingClaim -= layerClaim;
+        totalReinstatement += layerReinstatement;
+        totalPayable += layerPayable;
+        remainingClaim -= layerClaimGross;
       }
     });
 
-    const totalPayable = (netClaim * treaty.participationShare) / 100;
-    const totalReinstatement = reinstatements.reduce((sum, r) => sum + r.reinstatementAmount, 0);
     const retroRecovery = (totalPayable * treaty.retroPercentage) / 100;
+    const netExposure = totalPayable - retroRecovery;
 
     return {
-      deductible,
-      netClaim,
-      reinstatements,
-      totalPayable,
+      totalClaim,
+      overallDeductible,
+      netClaimAfterDeductible,
+      layerDistribution,
       totalReinstatement,
-      participationShare: treaty.participationShare,
+      totalPayable,
       retroRecovery,
-      retroPercentage: treaty.retroPercentage
+      netExposure,
+      participationShare: treaty.participationShare,
+      retroPercentage: treaty.retroPercentage,
+      treatyName: treaty.treatyName
     };
   };
 
-  const calculations = calculateReinstatement();
+  const calculations = calculateXOLLayerDistribution();
 
   const handleClaimSubmission = () => {
     const claimNumber = generateClaimReference("Motor", claimType);
-    alert(`Claim ${claimNumber} has been created and moved to Outstanding Claims.`);
+    
+    // Add to approved claims
+    const newClaim = {
+      id: Date.now(),
+      claimNumber,
+      contractNumber,
+      insuredName: treatyData[contractNumber]?.insuredName || "Unknown",
+      claimAmount: parseFloat(claimAmount),
+      currency,
+      status: "No Payment Made",
+      dateApproved: new Date().toISOString().split('T')[0],
+      dateOfLoss: new Date().toISOString().split('T')[0],
+      claimDescription: "New claim submission",
+      reserveAmount: parseFloat(reserveAmount),
+      claimAdvice: null,
+      paymentVoucher: null
+    };
+
+    setApprovedClaims(prev => [...prev, newClaim]);
+    
+    toast.success(`Claim ${claimNumber} has been created and moved to Outstanding Claims.`);
     
     if (calculations && calculations.totalReinstatement > 0) {
-      alert(`Reinstatement premium of USD ${calculations.totalReinstatement.toLocaleString()} has been automatically booked.`);
+      toast.info(`Reinstatement premium of USD ${calculations.totalReinstatement.toLocaleString()} has been automatically booked.`);
     }
+
+    // Reset form
+    setShowClaimForm(false);
+    setClaimAmount("");
+    setReserveAmount("");
+    setContractNumber("");
+  };
+
+  // Edit claim functionality
+  const handleEditClaim = (claim) => {
+    setEditingClaim(claim);
+    setEditFormData({
+      claimAmount: claim.claimAmount,
+      reserveAmount: claim.reserveAmount,
+      status: claim.status,
+      claimDescription: claim.claimDescription,
+      dateOfLoss: claim.dateOfLoss,
+      insuredName: claim.insuredName
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingClaim) return;
+
+    // Validation
+    if (!editFormData.claimAmount || !editFormData.reserveAmount) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    // Update the claim
+    setApprovedClaims(prev => 
+      prev.map(claim => 
+        claim.id === editingClaim.id 
+          ? { ...claim, ...editFormData, claimAmount: parseFloat(editFormData.claimAmount), reserveAmount: parseFloat(editFormData.reserveAmount) }
+          : claim
+      )
+    );
+
+    toast.success("Claim updated successfully");
+    setIsEditDialogOpen(false);
+    setEditingClaim(null);
+    setEditFormData({});
   };
 
   const searchClaims = () => {
     return approvedClaims.filter(claim => 
       (!searchClaimNumber || claim.claimNumber.includes(searchClaimNumber)) &&
-      (!searchDateOfLoss || claim.dateApproved === searchDateOfLoss)
+      (!searchDateOfLoss || claim.dateOfLoss === searchDateOfLoss)
     );
   };
 
@@ -171,7 +315,7 @@ const ClaimsModuleComprehensive = () => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Comprehensive Claims Management</h2>
-          <p className="text-gray-600">Advanced claims processing with standardized numbering</p>
+          <p className="text-gray-600">Advanced claims processing with layer-wise XOL calculations</p>
         </div>
       </div>
 
@@ -287,53 +431,6 @@ const ClaimsModuleComprehensive = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="dateOfLoss">Date of Loss</Label>
-                      <Input
-                        id="dateOfLoss"
-                        type="date"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="policyPeriodFrom">Policy Period From</Label>
-                      <Input
-                        id="policyPeriodFrom"
-                        type="date"
-                        value="2024-01-01"
-                        disabled
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="policyPeriodTo">Policy Period To</Label>
-                      <Input
-                        id="policyPeriodTo"
-                        type="date"
-                        value="2024-12-31"
-                        disabled
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="dateReported">Date Reported</Label>
-                      <Input
-                        id="dateReported"
-                        type="date"
-                        defaultValue={new Date().toISOString().split('T')[0]}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="treatyName">Treaty Name</Label>
-                      <Input
-                        id="treatyName"
-                        value={contractNumber && treatyData[contractNumber] ? treatyData[contractNumber].treatyName : ""}
-                        disabled
-                      />
-                    </div>
-                  </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="reserveAmount">Reserve Amount</Label>
@@ -373,34 +470,92 @@ const ClaimsModuleComprehensive = () => {
                   </div>
 
                   {claimType === "XOL" && calculations && (
-                    <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                      <h4 className="font-medium text-gray-900">Automatic Claim Calculations</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="bg-gray-50 p-6 rounded-lg space-y-4">
+                      <h4 className="font-medium text-gray-900 text-lg">Detailed XOL Claim Calculations</h4>
+                      
+                      {/* Summary Section */}
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white rounded border">
                         <div>
-                          <p>Deductible: <span className="font-bold">{currency} {calculations.deductible.toLocaleString()}</span></p>
-                          <p>Net Claim: <span className="font-bold">{currency} {calculations.netClaim.toLocaleString()}</span></p>
-                          <p>Participation Share: <span className="font-bold">{calculations.participationShare}%</span></p>
+                          <p className="text-sm text-gray-600">Total Claim</p>
+                          <p className="font-bold text-lg">{currency} {calculations.totalClaim.toLocaleString()}</p>
                         </div>
                         <div>
-                          <p>Total Payable: <span className="font-bold text-green-600">{currency} {calculations.totalPayable.toLocaleString()}</span></p>
-                          <p>Total Reinstatement: <span className="font-bold text-blue-600">{currency} {calculations.totalReinstatement.toLocaleString()}</span></p>
+                          <p className="text-sm text-gray-600">Overall Deductible</p>
+                          <p className="font-bold text-lg text-red-600">{currency} {calculations.overallDeductible.toLocaleString()}</p>
                         </div>
                         <div>
-                          <p>Retro Recovery: <span className="font-bold text-purple-600">{currency} {calculations.retroRecovery.toLocaleString()}</span></p>
-                          <p>Retro Percentage: <span className="font-bold">{calculations.retroPercentage}%</span></p>
+                          <p className="text-sm text-gray-600">Net After Deductible</p>
+                          <p className="font-bold text-lg">{currency} {calculations.netClaimAfterDeductible.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Total Payable</p>
+                          <p className="font-bold text-lg text-green-600">{currency} {calculations.totalPayable.toLocaleString()}</p>
                         </div>
                       </div>
 
-                      {calculations.reinstatements.length > 0 && (
-                        <div>
-                          <h5 className="font-medium mb-2">Reinstatement by Layer:</h5>
-                          {calculations.reinstatements.map((r, index) => (
-                            <p key={index} className="text-sm">
-                              {r.layer}: {currency} {r.reinstatementAmount.toLocaleString()}
-                            </p>
+                      {/* Layer-wise Breakdown */}
+                      <div>
+                        <h5 className="font-medium mb-3">Layer-wise Claim Distribution</h5>
+                        <div className="space-y-3">
+                          {calculations.layerDistribution.map((layer, index) => (
+                            <div key={index} className="border rounded-lg p-4 bg-white">
+                              <div className="flex justify-between items-center mb-3">
+                                <h6 className="font-medium text-blue-900">{layer.layerName}</h6>
+                                <Badge variant="outline">
+                                  {layer.utilizationPercentage.toFixed(1)}% Utilized
+                                </Badge>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                <div>
+                                  <p className="text-gray-600">Layer Limit</p>
+                                  <p className="font-medium">{currency} {layer.layerLimit.toLocaleString()}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-600">Claim Amount</p>
+                                  <p className="font-medium">{currency} {layer.claimAmountNet.toLocaleString()}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-600">Reinstatement ({layer.reinstatementRate}%)</p>
+                                  <p className="font-medium text-blue-600">{currency} {layer.reinstatementPremium.toLocaleString()}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-600">Payable Amount</p>
+                                  <p className="font-medium text-green-600">{currency} {layer.payableAmount.toLocaleString()}</p>
+                                </div>
+                              </div>
+
+                              <div className="mt-3 pt-3 border-t">
+                                <div className="flex justify-between text-sm">
+                                  <span>Remaining Capacity:</span>
+                                  <span className="font-medium">
+                                    {currency} {layer.remainingCapacityAfter.toLocaleString()} 
+                                    <span className="text-gray-500 ml-1">
+                                      (was {layer.remainingCapacityBefore.toLocaleString()})
+                                    </span>
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
                           ))}
                         </div>
-                      )}
+                      </div>
+
+                      {/* Financial Summary */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-blue-50 rounded">
+                        <div>
+                          <p className="text-sm text-blue-600">Total Reinstatement Premium</p>
+                          <p className="font-bold text-xl text-blue-900">{currency} {calculations.totalReinstatement.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-purple-600">Expected Retro Recovery ({calculations.retroPercentage}%)</p>
+                          <p className="font-bold text-xl text-purple-900">{currency} {calculations.retroRecovery.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-orange-600">Net Exposure</p>
+                          <p className="font-bold text-xl text-orange-900">{currency} {calculations.netExposure.toLocaleString()}</p>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -458,7 +613,7 @@ const ClaimsModuleComprehensive = () => {
                   </TableHeader>
                   <TableBody>
                     {approvedClaims.map((claim) => (
-                      <TableRow key={claim.claimNumber}>
+                      <TableRow key={claim.id}>
                         <TableCell className="font-mono text-sm">{claim.claimNumber}</TableCell>
                         <TableCell>{claim.contractNumber}</TableCell>
                         <TableCell>{claim.insuredName}</TableCell>
@@ -494,9 +649,9 @@ const ClaimsModuleComprehensive = () => {
                               <Eye className="h-3 w-3 mr-1" />
                               View
                             </Button>
-                            <Button size="sm">
+                            <Button size="sm" onClick={() => handleEditClaim(claim)}>
                               <Edit className="h-3 w-3 mr-1" />
-                              Process
+                              Edit
                             </Button>
                           </div>
                         </TableCell>
@@ -557,7 +712,7 @@ const ClaimsModuleComprehensive = () => {
                   </TableHeader>
                   <TableBody>
                     {searchClaims().map((claim) => (
-                      <TableRow key={claim.claimNumber}>
+                      <TableRow key={claim.id}>
                         <TableCell className="font-mono text-sm">{claim.claimNumber}</TableCell>
                         <TableCell>{claim.contractNumber}</TableCell>
                         <TableCell>{claim.insuredName}</TableCell>
@@ -587,7 +742,7 @@ const ClaimsModuleComprehensive = () => {
           <Card>
             <CardHeader>
               <CardTitle>Outstanding Claims</CardTitle>
-              <CardDescription>Manage and process outstanding claims with retro recovery information</CardDescription>
+              <CardDescription>Manage and process outstanding claims with edit functionality</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -624,7 +779,7 @@ const ClaimsModuleComprehensive = () => {
                       const netExposure = claim.claimAmount - retroRecovery;
                       
                       return (
-                        <TableRow key={claim.claimNumber}>
+                        <TableRow key={claim.id}>
                           <TableCell className="font-mono text-sm">{claim.claimNumber}</TableCell>
                           <TableCell>{claim.contractNumber}</TableCell>
                           <TableCell>{claim.insuredName}</TableCell>
@@ -645,7 +800,7 @@ const ClaimsModuleComprehensive = () => {
                           </TableCell>
                           <TableCell>
                             <div className="flex space-x-1">
-                              <Button size="sm" variant="outline">
+                              <Button size="sm" variant="outline" onClick={() => handleEditClaim(claim)}>
                                 <Edit className="h-3 w-3 mr-1" />
                                 Edit
                               </Button>
@@ -665,6 +820,104 @@ const ClaimsModuleComprehensive = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Claim Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Claim Details</DialogTitle>
+            <DialogDescription>
+              Modify claim information for {editingClaim?.claimNumber}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="editClaimAmount">Claim Amount *</Label>
+                <Input
+                  id="editClaimAmount"
+                  type="number"
+                  value={editFormData.claimAmount || ''}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, claimAmount: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editReserveAmount">Reserve Amount *</Label>
+                <Input
+                  id="editReserveAmount"
+                  type="number"
+                  value={editFormData.reserveAmount || ''}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, reserveAmount: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="editStatus">Payment Status</Label>
+                <Select 
+                  value={editFormData.status || ''} 
+                  onValueChange={(value) => setEditFormData(prev => ({ ...prev, status: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="No Payment Made">No Payment Made</SelectItem>
+                    <SelectItem value="Partial Payment">Partial Payment</SelectItem>
+                    <SelectItem value="Full Payment">Full Payment</SelectItem>
+                    <SelectItem value="Under Review">Under Review</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editDateOfLoss">Date of Loss</Label>
+                <Input
+                  id="editDateOfLoss"
+                  type="date"
+                  value={editFormData.dateOfLoss || ''}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, dateOfLoss: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="editInsuredName">Insured Name</Label>
+              <Input
+                id="editInsuredName"
+                value={editFormData.insuredName || ''}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, insuredName: e.target.value }))}
+                placeholder="Enter insured name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="editDescription">Claim Description</Label>
+              <Textarea
+                id="editDescription"
+                value={editFormData.claimDescription || ''}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, claimDescription: e.target.value }))}
+                placeholder="Enter claim description..."
+                rows={3}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdit}>
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
