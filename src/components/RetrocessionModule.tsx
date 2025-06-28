@@ -26,7 +26,6 @@ const RetrocessionModule = () => {
     { treatyId: "MAR-2024-003", treatyType: "Marine Treaty", gross: "12,200,000", retroCeded: "3,050,000", net: "9,150,000", allocation: 75 }
   ];
 
-  // Sample retro treaties data (moved from Claims)
   const retroTreaties = [
     {
       outwardPolicyNumber: "OUT-2024-001",
@@ -57,7 +56,6 @@ const RetrocessionModule = () => {
     }
   ];
 
-  // Sample treaty data for inward display (moved from Claims)
   const treatyData = {
     "12345": {
       treatyName: "Motor Treaty 2024",
@@ -92,7 +90,7 @@ const RetrocessionModule = () => {
       claimsPaid: 3200000,
       totalClaims: 5
     }
-  ];
+  };
 
   const searchRetroTreaties = (policyNumber: string, year: string) => {
     return retroTreaties.filter(treaty =>

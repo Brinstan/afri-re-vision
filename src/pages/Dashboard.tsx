@@ -172,10 +172,12 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm font-medium">{user?.username}</p>
-                <p className="text-xs text-gray-500">{user?.userType}</p>
-              </div>
+              {user && (
+                <div className="text-right">
+                  <p className="text-sm font-medium">{user.username}</p>
+                  <p className="text-xs text-gray-500">{user.userType}</p>
+                </div>
+              )}
               <Badge className="bg-green-100 text-green-800">Online</Badge>
               <Button variant="outline" size="sm">
                 <Settings className="h-4 w-4 mr-2" />
