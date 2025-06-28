@@ -7,7 +7,7 @@ import { useAuth } from "../components/AuthContext";
 import ActuarialEngine from "../components/ActuarialEngine";
 import PricingSystem from "../components/PricingSystem";
 import AccountingModule from "../components/AccountingModule";
-import ClaimsModuleNew from "../components/ClaimsModuleNew";
+import ClaimsModuleComprehensive from "../components/ClaimsModuleComprehensive";
 import TreatyManagementNew from "../components/TreatyManagementNew";
 import UnderwritingModule from "../components/UnderwritingModule";
 import IfrsReporting from "../components/IfrsReporting";
@@ -39,7 +39,7 @@ const Dashboard = () => {
       case "accounting":
         return <AccountingModule />;
       case "claims":
-        return <ClaimsModuleNew />;
+        return <ClaimsModuleComprehensive />;
       case "treaties":
         return <TreatyManagementNew />;
       case "underwriting":
