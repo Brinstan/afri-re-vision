@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, FileText, Plus, Calculator, RotateCcw, Download } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Search, FileText, Plus, Calculator, RotateCcw, Download, Eye } from "lucide-react";
 
 const TreatyManagementNew = () => {
   const [activeTab, setActiveTab] = useState("premium-booking");
@@ -23,12 +24,47 @@ const TreatyManagementNew = () => {
 
   // Sample treaty data
   const treatyData = {
-    "MT-2024-001": {
+    "12345": {
       treatyName: "Motor Treaty 2024",
       brokerageCommission: 25.00,
       cedant: "Century Insurance Ltd",
       inceptionDate: "2024-01-01",
-      expiryDate: "2024-12-31"
+      expiryDate: "2024-12-31",
+      participationShare: 50,
+      retroPercentage: 25,
+      broker: "AON Tanzania",
+      country: "Tanzania",
+      insuredName: "ABC Transport Ltd",
+      claimsPaid: 2500000,
+      totalClaims: 3
+    },
+    "12346": {
+      treatyName: "Property XOL 2024",
+      brokerageCommission: 20.00,
+      cedant: "National Insurance Corp",
+      inceptionDate: "2024-01-01",
+      expiryDate: "2024-12-31",
+      participationShare: 75,
+      retroPercentage: 30,
+      broker: "Marsh Tanzania",
+      country: "Tanzania",
+      insuredName: "XYZ Manufacturing",
+      claimsPaid: 1800000,
+      totalClaims: 2
+    },
+    "12347": {
+      treatyName: "Marine Treaty 2024",
+      brokerageCommission: 22.50,
+      cedant: "Jubilee Insurance",
+      inceptionDate: "2024-06-01",
+      expiryDate: "2025-05-31",
+      participationShare: 60,
+      retroPercentage: 20,
+      broker: "Willis Towers Watson",
+      country: "Kenya",
+      insuredName: "East Africa Shipping",
+      claimsPaid: 3200000,
+      totalClaims: 5
     }
   };
 
@@ -70,20 +106,27 @@ const TreatyManagementNew = () => {
     }
   };
 
+  const searchInwardTreaties = (contractNum: string, year: string) => {
+    return Object.entries(treatyData).filter(([key, treaty]) =>
+      (!contractNum || key.includes(contractNum)) &&
+      (!year || key.includes(year))
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Treaty Management</h2>
-          <p className="text-gray-600">Premium booking and monthly returns management</p>
+          <p className="text-gray-600">Premium booking, monthly returns, and inward treaty management</p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="premium-booking">Premium Booking</TabsTrigger>
           <TabsTrigger value="monthly-returns">Monthly Returns</TabsTrigger>
-          <TabsTrigger value="treaty-search">Treaty Search</TabsTrigger>
+          <TabsTrigger value="inward-display">Inward Treaty Display</TabsTrigger>
         </TabsList>
 
         <TabsContent value="premium-booking" className="space-y-4">
@@ -101,7 +144,7 @@ const TreatyManagementNew = () => {
                       id="contractNumber"
                       value={contractNumber}
                       onChange={(e) => setContractNumber(e.target.value)}
-                      placeholder="e.g., MT-2024-001"
+                      placeholder="e.g., 12345"
                     />
                   </div>
                   <div className="space-y-2">
@@ -306,7 +349,7 @@ const TreatyManagementNew = () => {
                   <Label htmlFor="returnContract">Contract Number</Label>
                   <Input
                     id="returnContract"
-                    placeholder="e.g., MT-2024-001"
+                    placeholder="e.g., 12345"
                   />
                 </div>
 
@@ -403,60 +446,208 @@ const TreatyManagementNew = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="treaty-search" className="space-y-4">
+        <TabsContent value="inward-display" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Treaty Search & Information</CardTitle>
-              <CardDescription>Search and view treaty details</CardDescription>
+              <CardTitle>Inward Treaty Display (Formerly Treaty Search)</CardTitle>
+              <CardDescription>Search inward treaties with comprehensive details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="searchContract">Contract Number</Label>
+                  <Label htmlFor="inwardContract">Contract Number</Label>
                   <Input
-                    id="searchContract"
-                    placeholder="e.g., MT-2024-001"
+                    id="inwardContract"
+                    placeholder="e.g., 12345"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="searchYear">Underwriting Year</Label>
+                  <Label htmlFor="inwardYear">Underwriting Year (Optional)</Label>
                   <Input
-                    id="searchYear"
+                    id="inwardYear"
                     placeholder="e.g., 2024"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="searchCedant">Cedant</Label>
-                  <Input
-                    id="searchCedant"
-                    placeholder="e.g., Century Insurance"
-                  />
-                </div>
               </div>
 
-              <Button>
-                <Search className="h-4 w-4 mr-2" />
-                Search Treaties
-              </Button>
+              <div className="flex space-x-2">
+                <Button>
+                  <Search className="h-4 w-4 mr-2" />
+                  Search
+                </Button>
+                <Button variant="outline">
+                  <Search className="h-4 w-4 mr-2" />
+                  Advanced Query
+                </Button>
+              </div>
 
-              <div className="border rounded-lg p-4">
-                <h4 className="font-medium mb-3">Search Results</h4>
-                <div className="space-y-3">
-                  <div className="border rounded p-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium">MT-2024-001 - Motor Treaty 2024</p>
-                        <p className="text-sm text-gray-600">Century Insurance Ltd</p>
-                        <p className="text-sm text-gray-600">Period: 01/01/2024 - 31/12/2024</p>
+              {/* Advanced Query Fields */}
+              <Card className="bg-gray-50">
+                <CardHeader>
+                  <CardTitle className="text-lg">Advanced Search Options</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="brokerName">Broker Name</Label>
+                      <Input
+                        id="brokerName"
+                        placeholder="e.g., AON Tanzania"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cedantName">Cedant Name</Label>
+                      <Input
+                        id="cedantName"
+                        placeholder="e.g., Century Insurance"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="country">Country</Label>
+                      <Select>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select country" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Tanzania">Tanzania</SelectItem>
+                          <SelectItem value="Kenya">Kenya</SelectItem>
+                          <SelectItem value="Uganda">Uganda</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="insuredNameSearch">Insured Name</Label>
+                      <Input
+                        id="insuredNameSearch"
+                        placeholder="e.g., ABC Transport"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Search Results */}
+              <div className="border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Contract</TableHead>
+                      <TableHead>Treaty Name</TableHead>
+                      <TableHead>Cedant</TableHead>
+                      <TableHead>Broker</TableHead>
+                      <TableHead>Country</TableHead>
+                      <TableHead>Retro %</TableHead>
+                      <TableHead>Claims Paid</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Object.entries(treatyData).map(([contractNum, treaty]) => (
+                      <TableRow key={contractNum}>
+                        <TableCell className="font-medium">{contractNum}</TableCell>
+                        <TableCell>{treaty.treatyName}</TableCell>
+                        <TableCell>{treaty.cedant}</TableCell>
+                        <TableCell>{treaty.broker}</TableCell>
+                        <TableCell>{treaty.country}</TableCell>
+                        <TableCell>{treaty.retroPercentage}%</TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">USD {treaty.claimsPaid.toLocaleString()}</p>
+                            <p className="text-xs text-gray-500">{treaty.totalClaims} claims total</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-1">
+                            <Button size="sm" variant="outline">
+                              <Eye className="h-3 w-3 mr-1" />
+                              Details
+                            </Button>
+                            <Button size="sm" variant="outline">
+                              <FileText className="h-3 w-3 mr-1" />
+                              Claims
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Detailed Treaty Information Display */}
+              <Card className="bg-blue-50">
+                <CardHeader>
+                  <CardTitle className="text-lg text-blue-900">Treaty Details</CardTitle>
+                  <CardDescription className="text-blue-700">
+                    Comprehensive information for selected treaty
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <h4 className="font-medium text-blue-900 mb-2">Underwriting Details</h4>
+                      <div className="space-y-1 text-sm text-blue-800">
+                        <p><strong>Participation Share:</strong> 50%</p>
+                        <p><strong>Commission Rate:</strong> 25%</p>
+                        <p><strong>Period:</strong> 01/01/2024 - 31/12/2024</p>
+                        <p><strong>Premium:</strong> USD 25.5M</p>
                       </div>
-                      <div className="text-right">
-                        <Badge variant="secondary">Active</Badge>
-                        <p className="text-sm mt-1">Premium: USD 25.5M</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-blue-900 mb-2">Retro Allocation</h4>
+                      <div className="space-y-1 text-sm text-blue-800">
+                        <p><strong>Retro Percentage:</strong> 25%</p>
+                        <p><strong>Net Retention:</strong> 75%</p>
+                        <p><strong>Retro Premium:</strong> USD 6.375M</p>
+                        <p><strong>Net Premium:</strong> USD 19.125M</p>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-blue-900 mb-2">Claims Information</h4>
+                      <div className="space-y-1 text-sm text-blue-800">
+                        <p><strong>Total Claims:</strong> 3</p>
+                        <p><strong>Claims Paid:</strong> USD 2.5M</p>
+                        <p><strong>Outstanding:</strong> USD 0</p>
+                        <p><strong>Loss Ratio:</strong> 9.8%</p>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
+
+                  <div className="border-t border-blue-200 pt-4">
+                    <h4 className="font-medium text-blue-900 mb-2">Individual Claims Details</h4>
+                    <div className="space-y-2">
+                      <div className="bg-white p-3 rounded border border-blue-200">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium text-sm">Claim #TAN/MV/TTY/2024/0001</p>
+                            <p className="text-xs text-gray-600">Date of Loss: 2024-11-15</p>
+                            <p className="text-xs text-gray-600">Insured: ABC Transport Ltd</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-sm">USD 850,000</p>
+                            <Badge variant="secondary" className="text-xs">Settled</Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-white p-3 rounded border border-blue-200">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium text-sm">Claim #TAN/MV/TTY/2024/0002</p>
+                            <p className="text-xs text-gray-600">Date of Loss: 2024-10-08</p>
+                            <p className="text-xs text-gray-600">Insured: ABC Transport Ltd</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-sm">USD 1,650,000</p>
+                            <Badge variant="secondary" className="text-xs">Settled</Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </CardContent>
           </Card>
         </TabsContent>
