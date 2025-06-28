@@ -7,11 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, FileText, CreditCard, TrendingUp, Download, Plus, Eye, CheckCircle, Edit } from "lucide-react";
-import { useAuth } from './AuthContext';
+import { DollarSign, FileText, CreditCard, TrendingUp, Download, Plus, Eye } from "lucide-react";
 
 const AccountingModule = () => {
-  const { user } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState("2024-12");
 
   // Sample financial data
@@ -48,32 +46,6 @@ const AccountingModule = () => {
     { account: "Claims Expense", debit: "62,175,000", credit: "0", balance: "62,175,000" },
     { account: "Commission Expense", debit: "22,312,500", credit: "0", balance: "22,312,500" },
     { account: "Reinsurance Premium", debit: "36,250,000", credit: "0", balance: "36,250,000" }
-  ];
-
-  // Sample approved claims data for payables
-  const approvedClaims = [
-    {
-      claimNumber: "TAN/MV/TTY/2024/0001",
-      contractNumber: "12345",
-      insuredName: "ABC Transport Ltd",
-      claimAmount: 2500000,
-      currency: "USD",
-      status: "No Payment Made",
-      dateApproved: "2024-12-15",
-      claimAdvice: null,
-      paymentVoucher: null
-    },
-    {
-      claimNumber: "TAN/F/FAC/2024/0002", 
-      contractNumber: "12346",
-      insuredName: "XYZ Manufacturing",
-      claimAmount: 1800000,
-      currency: "USD",
-      status: "Partial Payment",
-      dateApproved: "2024-12-10",
-      claimAdvice: "claim_advice_002.pdf",
-      paymentVoucher: "payment_voucher_002.pdf"
-    }
   ];
 
   return (
@@ -316,7 +288,7 @@ const AccountingModule = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="payables" className="space-y-4">
+        <TabsContent value="payables">
           <Card>
             <CardHeader>
               <CardTitle>Accounts Payable</CardTitle>
@@ -355,207 +327,6 @@ const AccountingModule = () => {
               </div>
             </CardContent>
           </Card>
-
-          {/* Claims Management Section - Moved from Claims Module */}
-          {user?.userType === 'Finance' && (
-            <Tabs defaultValue="manage-claims" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="manage-claims">Manage Claims</TabsTrigger>
-                <TabsTrigger value="commissions">Commissions</TabsTrigger>
-                <TabsTrigger value="receivables-detail">Receivables Detail</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="manage-claims" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Claims Management - Finance View</CardTitle>
-                    <CardDescription>Finance team access to approved claims for payment processing</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="border rounded-lg">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Claim Reference</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>Documents</TableHead>
-                            <TableHead>Payment Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {approvedClaims.map((claim) => (
-                            <TableRow key={claim.claimNumber}>
-                              <TableCell className="font-mono text-sm">{claim.claimNumber}</TableCell>
-                              <TableCell>{claim.currency} {claim.claimAmount.toLocaleString()}</TableCell>
-                              <TableCell>
-                                <div className="flex space-x-1">
-                                  <Button size="sm" variant="outline">
-                                    <Download className="h-3 w-3 mr-1" />
-                                    Claim Advice
-                                  </Button>
-                                  <Button size="sm" variant="outline">
-                                    <Download className="h-3 w-3 mr-1" />
-                                    Payment Voucher
-                                  </Button>
-                                  <Button size="sm" variant="outline">
-                                    <Download className="h-3 w-3 mr-1" />
-                                    Debit Note
-                                  </Button>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Select defaultValue={claim.status}>
-                                  <SelectTrigger className="w-32">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="No Payment Made">No Payment</SelectItem>
-                                    <SelectItem value="Partial Payment">Partial</SelectItem>
-                                    <SelectItem value="Full Payment">Full Payment</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex space-x-1">
-                                  <Button size="sm">
-                                    <DollarSign className="h-3 w-3 mr-1" />
-                                    Record Payment
-                                  </Button>
-                                  <Button size="sm" variant="outline">
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Update Status
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="commissions" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Commission Management</CardTitle>
-                    <CardDescription>Manage broker commissions and payments</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-blue-50 p-4 rounded-lg">
-                          <p className="text-sm text-blue-600 font-medium">Total Commissions Due</p>
-                          <p className="text-2xl font-bold text-blue-900">USD 3.2M</p>
-                        </div>
-                        <div className="bg-green-50 p-4 rounded-lg">
-                          <p className="text-sm text-green-600 font-medium">Paid This Month</p>
-                          <p className="text-2xl font-bold text-green-900">USD 1.8M</p>
-                        </div>
-                        <div className="bg-orange-50 p-4 rounded-lg">
-                          <p className="text-sm text-orange-600 font-medium">Pending Payment</p>
-                          <p className="text-2xl font-bold text-orange-900">USD 1.4M</p>
-                        </div>
-                      </div>
-                      
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Broker</TableHead>
-                            <TableHead>Commission Due</TableHead>
-                            <TableHead>Due Date</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          <TableRow>
-                            <TableCell>AON Tanzania</TableCell>
-                            <TableCell>USD 450,000</TableCell>
-                            <TableCell>2024-12-30</TableCell>
-                            <TableCell><Badge variant="outline">Pending</Badge></TableCell>
-                            <TableCell>
-                              <Button size="sm">Pay Commission</Button>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell>Marsh Tanzania</TableCell>
-                            <TableCell>USD 325,000</TableCell>
-                            <TableCell>2024-12-25</TableCell>
-                            <TableCell><Badge variant="destructive">Overdue</Badge></TableCell>
-                            <TableCell>
-                              <Button size="sm">Pay Commission</Button>
-                            </TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="receivables-detail" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Receivables Management</CardTitle>
-                    <CardDescription>Track and manage outstanding receivables</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-purple-50 p-4 rounded-lg">
-                          <p className="text-sm text-purple-600 font-medium">Premium Receivables</p>
-                          <p className="text-2xl font-bold text-purple-900">USD 8.75M</p>
-                        </div>
-                        <div className="bg-teal-50 p-4 rounded-lg">
-                          <p className="text-sm text-teal-600 font-medium">Retro Receivables</p>
-                          <p className="text-2xl font-bold text-teal-900">USD 12.2M</p>
-                        </div>
-                        <div className="bg-amber-50 p-4 rounded-lg">
-                          <p className="text-sm text-amber-600 font-medium">Other Receivables</p>
-                          <p className="text-2xl font-bold text-amber-900">USD 2.1M</p>
-                        </div>
-                      </div>
-
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Debtor</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>Age (Days)</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          <TableRow>
-                            <TableCell>Century Insurance Ltd</TableCell>
-                            <TableCell>USD 2.5M</TableCell>
-                            <TableCell>15</TableCell>
-                            <TableCell><Badge variant="secondary">Premium</Badge></TableCell>
-                            <TableCell>
-                              <Button size="sm" variant="outline">Follow Up</Button>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell>Swiss Re</TableCell>
-                            <TableCell>USD 1.8M</TableCell>
-                            <TableCell>45</TableCell>
-                            <TableCell><Badge variant="outline">Retro Recovery</Badge></TableCell>
-                            <TableCell>
-                              <Button size="sm" variant="outline">Follow Up</Button>
-                            </TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          )}
         </TabsContent>
 
         <TabsContent value="reports">
