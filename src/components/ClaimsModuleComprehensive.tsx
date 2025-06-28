@@ -101,28 +101,6 @@ const ClaimsModuleComprehensive = () => {
     }
   };
 
-  // Sample retro treaties data
-  const retroTreaties = [
-    {
-      outwardPolicyNumber: "OUT-2024-001",
-      underwritingYear: "2024",
-      treatyName: "Cat XOL Retro Cover",
-      reinsurer: "Swiss Re",
-      coverage: "250M xs 50M",
-      premium: 12500000,
-      commission: 15.0
-    },
-    {
-      outwardPolicyNumber: "OUT-2024-002", 
-      underwritingYear: "2024",
-      treatyName: "Quota Share Retro",
-      reinsurer: "Munich Re",
-      coverage: "25% of Portfolio",
-      premium: 28750000,
-      commission: 20.0
-    }
-  ];
-
   const handleClaimTypeSelection = (type: string) => {
     setClaimType(type);
     setShowClaimForm(true);
@@ -188,20 +166,6 @@ const ClaimsModuleComprehensive = () => {
     );
   };
 
-  const searchRetroTreaties = (policyNumber: string, year: string) => {
-    return retroTreaties.filter(treaty =>
-      (!policyNumber || treaty.outwardPolicyNumber.includes(policyNumber)) &&
-      (!year || treaty.underwritingYear === year)
-    );
-  };
-
-  const searchInwardTreaties = (contractNum: string, year: string) => {
-    return Object.entries(treatyData).filter(([key, treaty]) =>
-      (!contractNum || key.includes(contractNum)) &&
-      (!year || key.includes(year))
-    );
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -212,12 +176,11 @@ const ClaimsModuleComprehensive = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="new-claim">New Claim</TabsTrigger>
           <TabsTrigger value="approved-claims">Approved Claims</TabsTrigger>
           <TabsTrigger value="inward-claims">Inward Claims</TabsTrigger>
           <TabsTrigger value="outstanding-claims">Outstanding Claims</TabsTrigger>
-          <TabsTrigger value="retro-section">Retro Section</TabsTrigger>
         </TabsList>
 
         <TabsContent value="new-claim" className="space-y-4">
@@ -700,225 +663,6 @@ const ClaimsModuleComprehensive = () => {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="retro-section" className="space-y-4">
-          <Tabs defaultValue="new-outward" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="new-outward">New Outward</TabsTrigger>
-              <TabsTrigger value="outward-display">Outward Policy Display</TabsTrigger>
-              <TabsTrigger value="inward-display">Inward Treaty Display</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="new-outward" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>New Outward Retrocession</CardTitle>
-                  <CardDescription>Create new outward retrocession arrangements</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600">Existing outward retrocession functionality...</p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="outward-display" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Outward Policy Display</CardTitle>
-                  <CardDescription>Search and view all retrocession cession treaties</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="outwardPolicyNumber">Outward Policy Number</Label>
-                      <Input
-                        id="outwardPolicyNumber"
-                        placeholder="e.g., OUT-2024-001"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="outwardYear">Underwriting Year</Label>
-                      <Input
-                        id="outwardYear"
-                        placeholder="e.g., 2024"
-                      />
-                    </div>
-                  </div>
-
-                  <Button>
-                    <Search className="h-4 w-4 mr-2" />
-                    Search Retro Treaties
-                  </Button>
-
-                  <div className="border rounded-lg">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Policy Number</TableHead>
-                          <TableHead>Treaty Name</TableHead>
-                          <TableHead>Reinsurer</TableHead>
-                          <TableHead>Coverage</TableHead>
-                          <TableHead>Premium</TableHead>
-                          <TableHead>Commission</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {retroTreaties.map((treaty) => (
-                          <TableRow key={treaty.outwardPolicyNumber}>
-                            <TableCell className="font-medium">{treaty.outwardPolicyNumber}</TableCell>
-                            <TableCell>{treaty.treatyName}</TableCell>
-                            <TableCell>{treaty.reinsurer}</TableCell>
-                            <TableCell>{treaty.coverage}</TableCell>
-                            <TableCell>USD {treaty.premium.toLocaleString()}</TableCell>
-                            <TableCell>{treaty.commission}%</TableCell>
-                            <TableCell>
-                              <Button size="sm" variant="outline">
-                                <Eye className="h-3 w-3 mr-1" />
-                                View Details
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="inward-display" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Inward Treaty Display (Treaty Search)</CardTitle>
-                  <CardDescription>Search inward treaties with comprehensive details</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="inwardContract">Contract Number</Label>
-                      <Input
-                        id="inwardContract"
-                        placeholder="e.g., 12345"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="inwardYear">Underwriting Year (Optional)</Label>
-                      <Input
-                        id="inwardYear"
-                        placeholder="e.g., 2024"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex space-x-2">
-                    <Button>
-                      <Search className="h-4 w-4 mr-2" />
-                      Search
-                    </Button>
-                    <Button variant="outline">
-                      <Search className="h-4 w-4 mr-2" />
-                      Advanced Query
-                    </Button>
-                  </div>
-
-                  {/* Advanced Query Fields */}
-                  <Card className="bg-gray-50">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Advanced Search Options</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="brokerName">Broker Name</Label>
-                          <Input
-                            id="brokerName"
-                            placeholder="e.g., AON Tanzania"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="cedantName">Cedant Name</Label>
-                          <Input
-                            id="cedantName"
-                            placeholder="e.g., Century Insurance"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="country">Country</Label>
-                          <Select>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select country" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Tanzania">Tanzania</SelectItem>
-                              <SelectItem value="Kenya">Kenya</SelectItem>
-                              <SelectItem value="Uganda">Uganda</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="insuredNameSearch">Insured Name</Label>
-                          <Input
-                            id="insuredNameSearch"
-                            placeholder="e.g., ABC Transport"
-                          />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Search Results */}
-                  <div className="border rounded-lg">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Contract</TableHead>
-                          <TableHead>Treaty Name</TableHead>
-                          <TableHead>Cedant</TableHead>
-                          <TableHead>Broker</TableHead>
-                          <TableHead>Retro %</TableHead>
-                          <TableHead>Claims Paid</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {Object.entries(treatyData).map(([contractNum, treaty]) => (
-                          <TableRow key={contractNum}>
-                            <TableCell className="font-medium">{contractNum}</TableCell>
-                            <TableCell>{treaty.treatyName}</TableCell>
-                            <TableCell>{treaty.cedant}</TableCell>
-                            <TableCell>{treaty.broker}</TableCell>
-                            <TableCell>{treaty.retroPercentage}%</TableCell>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium">USD 2.5M</p>
-                                <p className="text-xs text-gray-500">3 claims total</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex space-x-1">
-                                <Button size="sm" variant="outline">
-                                  <Eye className="h-3 w-3 mr-1" />
-                                  Details
-                                </Button>
-                                <Button size="sm" variant="outline">
-                                  <FileText className="h-3 w-3 mr-1" />
-                                  Claims
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
         </TabsContent>
       </Tabs>
     </div>
