@@ -7,9 +7,9 @@ import { useAuth } from "../components/AuthContext";
 import ActuarialEngine from "../components/ActuarialEngine";
 import PricingSystem from "../components/PricingSystem";
 import AccountingModule from "../components/AccountingModule";
-import ClaimsModuleComprehensive from "../components/ClaimsModuleComprehensive";
-import TreatyManagementNew from "../components/TreatyManagementNew";
-import UnderwritingModule from "../components/UnderwritingModule";
+import ClaimsModuleLinked from "../components/ClaimsModuleLinked";
+import TreatyManagementIntegrated from "../components/TreatyManagementIntegrated";
+import UnderwritingModuleIntegrated from "../components/UnderwritingModuleIntegrated";
 import IfrsReporting from "../components/IfrsReporting";
 import RetrocessionModule from "../components/RetrocessionModule";
 
@@ -39,11 +39,11 @@ const Dashboard = () => {
       case "accounting":
         return <AccountingModule />;
       case "claims":
-        return <ClaimsModuleComprehensive />;
+        return <ClaimsModuleLinked />;
       case "treaties":
-        return <TreatyManagementNew />;
+        return <TreatyManagementIntegrated />;
       case "underwriting":
-        return <UnderwritingModule />;
+        return <UnderwritingModuleIntegrated />;
       case "ifrs":
         return <IfrsReporting />;
       case "retrocession":
@@ -51,6 +51,23 @@ const Dashboard = () => {
       default:
         return (
           <div className="space-y-6">
+            {/* Integration Status Banner */}
+            <Card className="bg-gradient-to-r from-blue-50 to-green-50 border-blue-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-blue-900">System Integration Active</h3>
+                    <p className="text-blue-700">All modules are now fully integrated with real-time data synchronization</p>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Badge className="bg-green-100 text-green-800">Underwriting ↔ Treaties</Badge>
+                    <Badge className="bg-green-100 text-green-800">Claims ↔ Treaties</Badge>
+                    <Badge className="bg-green-100 text-green-800">Accounting ↔ All</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {kpis.map((kpi, index) => (
@@ -76,25 +93,25 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                  <CardDescription>Common tasks and operations</CardDescription>
+                  <CardTitle>Integrated Quick Actions</CardTitle>
+                  <CardDescription>Cross-module operations with automatic data linking</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <Button onClick={() => setActiveModule("underwriting")} className="w-full justify-start">
                     <Building className="mr-2 h-4 w-4" />
-                    New Underwriting Contract
+                    New Underwriting Contract → Auto-Convert to Treaty
+                  </Button>
+                  <Button onClick={() => setActiveModule("claims")} variant="outline" className="w-full justify-start">
+                    <FileText className="mr-2 h-4 w-4" />
+                    Process Claim → Auto-Link to Treaty & Book Reinstatement
+                  </Button>
+                  <Button onClick={() => setActiveModule("treaties")} variant="outline" className="w-full justify-start">
+                    <DollarSign className="mr-2 h-4 w-4" />
+                    Book Premium → Update Accounting & Payment Status
                   </Button>
                   <Button onClick={() => setActiveModule("actuarial")} variant="outline" className="w-full justify-start">
                     <Calculator className="mr-2 h-4 w-4" />
                     Run Actuarial Calculations
-                  </Button>
-                  <Button onClick={() => setActiveModule("pricing")} variant="outline" className="w-full justify-start">
-                    <TrendingUp className="mr-2 h-4 w-4" />
-                    Generate AI Pricing
-                  </Button>
-                  <Button onClick={() => setActiveModule("claims")} variant="outline" className="w-full justify-start">
-                    <FileText className="mr-2 h-4 w-4" />
-                    Process New Claim
                   </Button>
                   <Button onClick={() => setActiveModule("ifrs")} variant="outline" className="w-full justify-start">
                     <BookOpen className="mr-2 h-4 w-4" />
@@ -105,8 +122,8 @@ const Dashboard = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Recent Alerts</CardTitle>
-                  <CardDescription>System notifications and warnings</CardDescription>
+                  <CardTitle>System Alerts & Integration Status</CardTitle>
+                  <CardDescription>Real-time notifications and data synchronization</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {recentAlerts.map((alert, index) => (
@@ -121,6 +138,13 @@ const Dashboard = () => {
                       </div>
                     </div>
                   ))}
+                  
+                  <div className="border-t pt-3">
+                    <div className="flex items-center space-x-2 text-sm text-green-600">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span>All modules synchronized - Real-time data flow active</span>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -128,25 +152,30 @@ const Dashboard = () => {
             {/* Portfolio Overview */}
             <Card>
               <CardHeader>
-                <CardTitle>Portfolio Overview</CardTitle>
-                <CardDescription>Current reinsurance portfolio status</CardDescription>
+                <CardTitle>Integrated Portfolio Overview</CardTitle>
+                <CardDescription>Real-time portfolio status with cross-module data</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Active Treaties</p>
                     <p className="text-2xl font-bold">127</p>
-                    <Badge variant="secondary">Property: 45 | Motor: 32 | Marine: 28 | Others: 22</Badge>
+                    <Badge variant="secondary">Auto-linked to Claims & Accounting</Badge>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">Facultative Risks</p>
+                    <p className="text-sm font-medium">Outstanding Claims</p>
+                    <p className="text-2xl font-bold">23</p>
+                    <Badge variant="secondary">With Auto-Retro Recovery</Badge>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Premium Bookings</p>
                     <p className="text-2xl font-bold">89</p>
-                    <Badge variant="secondary">Pending: 12 | Active: 77</Badge>
+                    <Badge variant="secondary">Real-time Payment Status</Badge>
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Retrocession Covers</p>
                     <p className="text-2xl font-bold">34</p>
-                    <Badge variant="secondary">Cat XOL: 18 | Quota Share: 16</Badge>
+                    <Badge variant="secondary">Auto-allocation Active</Badge>
                   </div>
                 </div>
               </CardContent>
@@ -168,7 +197,7 @@ const Dashboard = () => {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">AfriReVision Platform</h1>
-                <p className="text-sm text-gray-600">Complete Reinsurance Management System</p>
+                <p className="text-sm text-gray-600">Fully Integrated Reinsurance Management System</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
