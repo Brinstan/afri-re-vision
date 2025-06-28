@@ -7,14 +7,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, FileText, CreditCard, TrendingUp, Download, Plus, Eye, CheckCircle, Edit } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
+import { DollarSign, FileText, CreditCard, TrendingUp, Download, Plus, Eye, CheckCircle, Edit, Calculator, Receipt, AlertCircle } from "lucide-react";
 import { useAuth } from './AuthContext';
 
 const AccountingModule = () => {
   const { user } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState("2024-12");
+  const [selectedPremium, setSelectedPremium] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [partialAmount, setPartialAmount] = useState("");
+  const [commissionAmount, setCommissionAmount] = useState("");
+  const [documentType, setDocumentType] = useState("");
 
-  // Sample financial data
+  // Sample financial summary data
   const financialSummary = [
     { metric: "Gross Premium Written", amount: "125,500,000", change: "+8.5%", status: "positive" },
     { metric: "Net Premium Earned", amount: "89,250,000", change: "+5.2%", status: "positive" },
@@ -24,30 +31,99 @@ const AccountingModule = () => {
     { metric: "Technical Reserves", amount: "198,500,000", change: "+4.7%", status: "neutral" }
   ];
 
-  const recentTransactions = [
-    { date: "2024-12-20", type: "Premium Receipt", reference: "PR-2024-1205", amount: "2,500,000", currency: "USD", status: "Completed" },
-    { date: "2024-12-19", type: "Claim Payment", reference: "CP-2024-0892", amount: "-1,850,000", currency: "USD", status: "Completed" },
-    { date: "2024-12-18", type: "Commission Payment", reference: "COM-2024-0445", amount: "-325,000", currency: "USD", status: "Pending" },
-    { date: "2024-12-17", type: "Retro Receipt", reference: "RR-2024-0167", amount: "750,000", currency: "USD", status: "Completed" },
-    { date: "2024-12-16", type: "Premium Receipt", reference: "PR-2024-1204", amount: "1,200,000", currency: "USD", status: "Completed" }
+  // Sample premium bookings from Underwriting and Claims
+  const premiumBookings = [
+    {
+      id: "PB-2024-001",
+      contractNumber: "12345",
+      treatyName: "Motor Treaty 2024",
+      cedant: "Century Insurance Ltd",
+      broker: "AON Tanzania",
+      premiumType: "MDP",
+      premiumAmount: 2500000,
+      currency: "USD",
+      bookingDate: "2024-12-15",
+      dueDate: "2024-12-30",
+      paymentStatus: "Unpaid",
+      amountReceived: 0,
+      department: "Underwriting",
+      brokerageRate: 25.0,
+      vatAmount: 450000,
+      netAmount: 2950000
+    },
+    {
+      id: "PB-2024-002",
+      contractNumber: "12346",
+      treatyName: "Property XOL 2024",
+      cedant: "National Insurance Corp",
+      broker: "Marsh Tanzania",
+      premiumType: "Adjustment",
+      premiumAmount: 1800000,
+      currency: "USD",
+      bookingDate: "2024-12-10",
+      dueDate: "2024-12-25",
+      paymentStatus: "Partially Paid",
+      amountReceived: 900000,
+      department: "Claims",
+      brokerageRate: 20.0,
+      vatAmount: 324000,
+      netAmount: 2124000
+    },
+    {
+      id: "PB-2024-003",
+      contractNumber: "12347",
+      treatyName: "Marine Treaty 2024",
+      cedant: "Jubilee Insurance",
+      broker: "Willis Towers Watson",
+      premiumType: "Reinstatement",
+      premiumAmount: 750000,
+      currency: "USD",
+      bookingDate: "2024-12-08",
+      dueDate: "2024-12-20",
+      paymentStatus: "Fully Paid",
+      amountReceived: 750000,
+      department: "Claims",
+      brokerageRate: 22.5,
+      vatAmount: 135000,
+      netAmount: 885000
+    }
   ];
 
-  const outstandingItems = [
-    { type: "Premium Due", party: "ABC Insurance Ltd", amount: "850,000", dueDate: "2024-12-25", overdue: false },
-    { type: "Commission Payable", party: "XYZ Brokers", amount: "125,000", dueDate: "2024-12-22", overdue: true },
-    { type: "Claim Settlement", party: "DEF Insurance", amount: "2,200,000", dueDate: "2024-12-28", overdue: false },
-    { type: "Retro Commission", party: "Global Re", amount: "450,000", dueDate: "2024-12-30", overdue: false }
-  ];
-
-  const trialBalance = [
-    { account: "Cash and Bank", debit: "15,500,000", credit: "0", balance: "15,500,000" },
-    { account: "Premium Receivables", debit: "8,750,000", credit: "0", balance: "8,750,000" },
-    { account: "Reinsurance Receivables", debit: "12,200,000", credit: "0", balance: "12,200,000" },
-    { account: "Technical Reserves", debit: "0", credit: "198,500,000", balance: "-198,500,000" },
-    { account: "Premium Income", debit: "0", credit: "125,500,000", balance: "-125,500,000" },
-    { account: "Claims Expense", debit: "62,175,000", credit: "0", balance: "62,175,000" },
-    { account: "Commission Expense", debit: "22,312,500", credit: "0", balance: "22,312,500" },
-    { account: "Reinsurance Premium", debit: "36,250,000", credit: "0", balance: "36,250,000" }
+  // Sample retrocession commissions
+  const retroCommissions = [
+    {
+      id: "RC-2024-001",
+      retroCover: "Cat XOL Retro",
+      reinsurer: "Swiss Re",
+      expectedAmount: 1250000,
+      receivedAmount: 1250000,
+      currency: "USD",
+      dueDate: "2024-12-31",
+      status: "Received",
+      commissionRate: 15.0
+    },
+    {
+      id: "RC-2024-002",
+      retroCover: "Quota Share Retro",
+      reinsurer: "Munich Re",
+      expectedAmount: 2875000,
+      receivedAmount: 0,
+      currency: "USD",
+      dueDate: "2024-12-28",
+      status: "Pending",
+      commissionRate: 20.0
+    },
+    {
+      id: "RC-2024-003",
+      retroCover: "Working XOL Retro",
+      reinsurer: "Lloyd's Syndicate",
+      expectedAmount: 650000,
+      receivedAmount: 325000,
+      currency: "USD",
+      dueDate: "2024-12-25",
+      status: "Partial",
+      commissionRate: 12.5
+    }
   ];
 
   // Sample approved claims data for payables
@@ -75,6 +151,45 @@ const AccountingModule = () => {
       paymentVoucher: "payment_voucher_002.pdf"
     }
   ];
+
+  const handlePaymentStatusUpdate = (premiumId, newStatus, amount = 0) => {
+    // Update payment status and sync with Treaties module
+    const premium = premiumBookings.find(p => p.id === premiumId);
+    if (premium) {
+      premium.paymentStatus = newStatus;
+      if (newStatus === "Partially Paid" && amount > 0) {
+        premium.amountReceived = amount;
+      } else if (newStatus === "Fully Paid") {
+        premium.amountReceived = premium.netAmount;
+      }
+      
+      // Simulate real-time sync to Treaties module
+      alert(`Payment status updated to "${newStatus}" and synchronized with Treaties module.`);
+    }
+  };
+
+  const generateDocument = (type, premiumId) => {
+    const premium = premiumBookings.find(p => p.id === premiumId);
+    if (!premium) return;
+
+    const docNumber = `${type.toUpperCase()}-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999)).padStart(4, '0')}`;
+    
+    // Simulate document generation
+    alert(`${type === 'debit' ? 'Debit Note' : 'Credit Note'} ${docNumber} generated for ${premium.treatyName} - Amount: ${premium.currency} ${premium.premiumAmount.toLocaleString()}`);
+  };
+
+  const calculateCommissionDue = (premium) => {
+    return (premium.premiumAmount * premium.brokerageRate) / 100;
+  };
+
+  const getPaymentStatusColor = (status) => {
+    switch (status) {
+      case "Fully Paid": return "bg-green-100 text-green-800";
+      case "Partially Paid": return "bg-yellow-100 text-yellow-800";
+      case "Unpaid": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -104,7 +219,6 @@ const AccountingModule = () => {
       <Tabs defaultValue="dashboard" className="space-y-4">
         <TabsList>
           <TabsTrigger value="dashboard">Financial Dashboard</TabsTrigger>
-          <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="receivables">Receivables</TabsTrigger>
           <TabsTrigger value="payables">Payables</TabsTrigger>
           <TabsTrigger value="reports">Financial Reports</TabsTrigger>
@@ -131,189 +245,496 @@ const AccountingModule = () => {
               </Card>
             ))}
           </div>
+        </TabsContent>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Transactions</CardTitle>
-                <CardDescription>Latest financial transactions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {recentTransactions.slice(0, 5).map((transaction, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-2 h-2 rounded-full ${
-                          transaction.type.includes('Receipt') ? 'bg-green-500' : 'bg-red-500'
-                        }`} />
+        <TabsContent value="receivables" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <p className="text-sm text-blue-600 font-medium">Total Premium Receivables</p>
+              <p className="text-2xl font-bold text-blue-900">USD 8.75M</p>
+              <p className="text-xs text-blue-600">Outstanding from cedants</p>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg">
+              <p className="text-sm text-green-600 font-medium">Retro Commissions Due</p>
+              <p className="text-2xl font-bold text-green-900">USD 4.78M</p>
+              <p className="text-xs text-green-600">Expected from reinsurers</p>
+            </div>
+            <div className="bg-yellow-50 p-4 rounded-lg">
+              <p className="text-sm text-yellow-600 font-medium">Overdue Payments</p>
+              <p className="text-2xl font-bold text-yellow-900">USD 1.2M</p>
+              <p className="text-xs text-yellow-600">Require follow-up</p>
+            </div>
+            <div className="bg-purple-50 p-4 rounded-lg">
+              <p className="text-sm text-purple-600 font-medium">Collection Rate</p>
+              <p className="text-2xl font-bold text-purple-900">87.5%</p>
+              <p className="text-xs text-purple-600">This month</p>
+            </div>
+          </div>
+
+          <Tabs defaultValue="premium-tracking" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="premium-tracking">Premium Tracking</TabsTrigger>
+              <TabsTrigger value="retro-commissions">Retro Commissions</TabsTrigger>
+              <TabsTrigger value="document-generation">Document Generation</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="premium-tracking" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Premium Allocation & Tracking</CardTitle>
+                  <CardDescription>
+                    Manage all premiums booked by Underwriting and Claims departments with real-time status updates
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div className="flex space-x-4">
+                        <Button>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Manual Premium Entry
+                        </Button>
+                        <Button variant="outline">
+                          <Calculator className="h-4 w-4 mr-2" />
+                          Bulk Update
+                        </Button>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Input placeholder="Search by contract or cedant..." className="w-64" />
+                        <Button variant="outline">Filter</Button>
+                      </div>
+                    </div>
+
+                    <div className="border rounded-lg">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Contract</TableHead>
+                            <TableHead>Treaty/Cedant</TableHead>
+                            <TableHead>Premium Details</TableHead>
+                            <TableHead>Payment Status</TableHead>
+                            <TableHead>Amount Received</TableHead>
+                            <TableHead>Due Date</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {premiumBookings.map((premium) => (
+                            <TableRow key={premium.id}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{premium.contractNumber}</p>
+                                  <p className="text-xs text-gray-500">{premium.department}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{premium.treatyName}</p>
+                                  <p className="text-sm text-gray-600">{premium.cedant}</p>
+                                  <p className="text-xs text-gray-500">Broker: {premium.broker}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{premium.currency} {premium.premiumAmount.toLocaleString()}</p>
+                                  <p className="text-xs text-gray-500">{premium.premiumType}</p>
+                                  <p className="text-xs text-gray-500">VAT: {premium.currency} {premium.vatAmount.toLocaleString()}</p>
+                                  <p className="text-xs font-medium">Net: {premium.currency} {premium.netAmount.toLocaleString()}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Select 
+                                  value={premium.paymentStatus} 
+                                  onValueChange={(value) => handlePaymentStatusUpdate(premium.id, value)}
+                                >
+                                  <SelectTrigger className="w-32">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Unpaid">Unpaid</SelectItem>
+                                    <SelectItem value="Partially Paid">Partially Paid</SelectItem>
+                                    <SelectItem value="Fully Paid">Fully Paid</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{premium.currency} {premium.amountReceived.toLocaleString()}</p>
+                                  {premium.paymentStatus === "Partially Paid" && (
+                                    <div className="mt-1">
+                                      <Input
+                                        type="number"
+                                        placeholder="Update amount"
+                                        className="w-24 h-6 text-xs"
+                                        value={partialAmount}
+                                        onChange={(e) => setPartialAmount(e.target.value)}
+                                      />
+                                    </div>
+                                  )}
+                                  <Progress 
+                                    value={(premium.amountReceived / premium.netAmount) * 100} 
+                                    className="w-20 h-1 mt-1"
+                                  />
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="text-sm">{premium.dueDate}</p>
+                                  {new Date(premium.dueDate) < new Date() && premium.paymentStatus !== "Fully Paid" && (
+                                    <Badge variant="destructive" className="text-xs">Overdue</Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex space-x-1">
+                                  <Button size="sm" variant="outline">
+                                    <Eye className="h-3 w-3 mr-1" />
+                                    View
+                                  </Button>
+                                  <Button size="sm" variant="outline">
+                                    <Edit className="h-3 w-3 mr-1" />
+                                    Update
+                                  </Button>
+                                  <Button size="sm">
+                                    <Receipt className="h-3 w-3 mr-1" />
+                                    Receipt
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-blue-900 mb-2">Real-Time Synchronization</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-800">
                         <div>
-                          <p className="text-sm font-medium">{transaction.type}</p>
-                          <p className="text-xs text-gray-500">{transaction.reference}</p>
+                          <p>• Payment status updates automatically sync to Treaties module</p>
+                          <p>• Premium booking changes reflect in Premium Booked section</p>
+                          <p>• Commission calculations update broker payment schedules</p>
+                        </div>
+                        <div>
+                          <p>• Overdue alerts trigger automatic follow-up workflows</p>
+                          <p>• Collection metrics update dashboard in real-time</p>
+                          <p>• IFRS 17 revenue recognition adjusts automatically</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className={`text-sm font-medium ${
-                          transaction.amount.startsWith('-') ? 'text-red-600' : 'text-green-600'
-                        }`}>
-                          {transaction.amount.startsWith('-') ? '' : '+'}USD {parseInt(transaction.amount.replace('-', '')).toLocaleString()}
-                        </p>
-                        <Badge variant={transaction.status === 'Completed' ? 'secondary' : 'outline'}>
-                          {transaction.status}
-                        </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="retro-commissions" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Retrocession Commission Management</CardTitle>
+                  <CardDescription>Track and manage retrocession commissions from reinsurers</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <p className="text-sm text-green-600 font-medium">Total Expected</p>
+                        <p className="text-2xl font-bold text-green-900">USD 4.78M</p>
+                      </div>
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <p className="text-sm text-blue-600 font-medium">Received</p>
+                        <p className="text-2xl font-bold text-blue-900">USD 1.58M</p>
+                      </div>
+                      <div className="bg-orange-50 p-4 rounded-lg">
+                        <p className="text-sm text-orange-600 font-medium">Outstanding</p>
+                        <p className="text-2xl font-bold text-orange-900">USD 3.2M</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-                <Button variant="outline" className="w-full mt-4">
-                  <Eye className="h-4 w-4 mr-2" />
-                  View All Transactions
-                </Button>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Outstanding Items</CardTitle>
-                <CardDescription>Pending receivables and payables</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {outstandingItems.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="text-sm font-medium">{item.type}</p>
-                        <p className="text-xs text-gray-500">{item.party}</p>
-                        <p className="text-xs text-gray-500">Due: {item.dueDate}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium">USD {parseInt(item.amount).toLocaleString()}</p>
-                        <Badge variant={item.overdue ? 'destructive' : 'outline'}>
-                          {item.overdue ? 'Overdue' : 'Due'}
-                        </Badge>
-                      </div>
+                    <div className="border rounded-lg">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Retro Cover</TableHead>
+                            <TableHead>Reinsurer</TableHead>
+                            <TableHead>Expected Amount</TableHead>
+                            <TableHead>Received Amount</TableHead>
+                            <TableHead>Due Date</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {retroCommissions.map((commission) => (
+                            <TableRow key={commission.id}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{commission.retroCover}</p>
+                                  <p className="text-xs text-gray-500">Rate: {commission.commissionRate}%</p>
+                                </div>
+                              </TableCell>
+                              <TableCell>{commission.reinsurer}</TableCell>
+                              <TableCell>{commission.currency} {commission.expectedAmount.toLocaleString()}</TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{commission.currency} {commission.receivedAmount.toLocaleString()}</p>
+                                  <Progress 
+                                    value={(commission.receivedAmount / commission.expectedAmount) * 100} 
+                                    className="w-20 h-1 mt-1"
+                                  />
+                                </div>
+                              </TableCell>
+                              <TableCell>{commission.dueDate}</TableCell>
+                              <TableCell>
+                                <Badge className={getPaymentStatusColor(commission.status)}>
+                                  {commission.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex space-x-1">
+                                  <Button size="sm" variant="outline">
+                                    <DollarSign className="h-3 w-3 mr-1" />
+                                    Record
+                                  </Button>
+                                  <Button size="sm" variant="outline">
+                                    <AlertCircle className="h-3 w-3 mr-1" />
+                                    Follow Up
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
-                  ))}
-                </div>
-                <Button variant="outline" className="w-full mt-4">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add New Entry
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
 
-        <TabsContent value="transactions">
-          <Card>
-            <CardHeader>
-              <CardTitle>Transaction Management</CardTitle>
-              <CardDescription>Create and manage financial transactions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex space-x-4">
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      New Transaction
-                    </Button>
-                    <Button variant="outline">
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      Bulk Upload
-                    </Button>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Input placeholder="Search transactions..." className="w-64" />
-                    <Button variant="outline">Filter</Button>
-                  </div>
-                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Card className="bg-gray-50">
+                        <CardHeader>
+                          <CardTitle className="text-lg">Record Commission Receipt</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="space-y-2">
+                            <Label>Commission ID</Label>
+                            <Select>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select commission" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {retroCommissions.map((comm) => (
+                                  <SelectItem key={comm.id} value={comm.id}>
+                                    {comm.retroCover} - {comm.reinsurer}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Amount Received</Label>
+                            <Input
+                              type="number"
+                              value={commissionAmount}
+                              onChange={(e) => setCommissionAmount(e.target.value)}
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Receipt Date</Label>
+                            <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} />
+                          </div>
+                          <Button className="w-full">
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Record Receipt
+                          </Button>
+                        </CardContent>
+                      </Card>
 
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Reference</TableHead>
-                      <TableHead>Party</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Currency</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentTransactions.map((transaction, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{transaction.date}</TableCell>
-                        <TableCell>{transaction.type}</TableCell>
-                        <TableCell className="font-mono">{transaction.reference}</TableCell>
-                        <TableCell>-</TableCell>
-                        <TableCell className={transaction.amount.startsWith('-') ? 'text-red-600' : 'text-green-600'}>
-                          {transaction.amount.startsWith('-') ? '-' : '+'}USD {parseInt(transaction.amount.replace('-', '')).toLocaleString()}
-                        </TableCell>
-                        <TableCell>{transaction.currency}</TableCell>
-                        <TableCell>
-                          <Badge variant={transaction.status === 'Completed' ? 'secondary' : 'outline'}>
-                            {transaction.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button size="sm" variant="ghost">Edit</Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="receivables">
-          <Card>
-            <CardHeader>
-              <CardTitle>Accounts Receivable</CardTitle>
-              <CardDescription>Manage premium and reinsurance receivables</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <p className="text-sm text-blue-600 font-medium">Total Receivables</p>
-                    <p className="text-2xl font-bold text-blue-900">USD 20.95M</p>
-                  </div>
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <p className="text-sm text-green-600 font-medium">Current (0-30 days)</p>
-                    <p className="text-2xl font-bold text-green-900">USD 15.2M</p>
-                  </div>
-                  <div className="bg-yellow-50 p-4 rounded-lg">
-                    <p className="text-sm text-yellow-600 font-medium">Overdue (31-90 days)</p>
-                    <p className="text-2xl font-bold text-yellow-900">USD 4.1M</p>
-                  </div>
-                  <div className="bg-red-50 p-4 rounded-lg">
-                    <p className="text-sm text-red-600 font-medium">Past Due (90+ days)</p>
-                    <p className="text-2xl font-bold text-red-900">USD 1.65M</p>
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium mb-2">Aging Analysis</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p>• Premium receivables aging shows healthy collection pattern</p>
-                      <p>• 72.5% of receivables are current (within 30 days)</p>
-                      <p>• Retrocession receivables total USD 12.2M</p>
-                    </div>
-                    <div>
-                      <p>• Average collection period: 35 days</p>
-                      <p>• Bad debt provision: 2.1% of total receivables</p>
-                      <p>• Foreign exchange exposure: USD 8.5M</p>
+                      <Card className="bg-gray-50">
+                        <CardHeader>
+                          <CardTitle className="text-lg">Commission Analytics</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-sm">Collection Rate</span>
+                              <span className="font-medium">33.1%</span>
+                            </div>
+                            <Progress value={33.1} className="h-2" />
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-sm">Average Days to Collect</span>
+                              <span className="font-medium">45 days</span>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-sm">Overdue Amount</span>
+                              <span className="font-medium text-red-600">USD 2.9M</span>
+                            </div>
+                          </div>
+                          <Button variant="outline" className="w-full">
+                            <TrendingUp className="h-4 w-4 mr-2" />
+                            View Detailed Analytics
+                          </Button>
+                        </CardContent>
+                      </Card>
                     </div>
                   </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="document-generation" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Automated Document Generation</CardTitle>
+                  <CardDescription>Generate standardized debit notes and credit notes with all transaction details</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <Card className="bg-blue-50">
+                        <CardHeader>
+                          <CardTitle className="text-lg text-blue-900">Generate New Document</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Document Type</Label>
+                            <Select value={documentType} onValueChange={setDocumentType}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select document type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="debit">Debit Note</SelectItem>
+                                <SelectItem value="credit">Credit Note</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Premium/Transaction</Label>
+                            <Select>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select premium" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {premiumBookings.map((premium) => (
+                                  <SelectItem key={premium.id} value={premium.id}>
+                                    {premium.contractNumber} - {premium.treatyName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Reason/Description</Label>
+                            <Textarea
+                              placeholder="Enter reason for document generation..."
+                              rows={3}
+                            />
+                          </div>
+                          <Button className="w-full">
+                            <FileText className="h-4 w-4 mr-2" />
+                            Generate Document
+                          </Button>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-green-50">
+                        <CardHeader>
+                          <CardTitle className="text-lg text-green-900">Document Templates</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-3">
+                            <div className="border border-green-200 rounded p-3 bg-white">
+                              <h4 className="font-medium">Standard Debit Note</h4>
+                              <p className="text-sm text-gray-600">For premium adjustments and additional charges</p>
+                              <div className="mt-2 text-xs text-green-700">
+                                ✓ Company letterhead<br/>
+                                ✓ Treaty details<br/>
+                                ✓ Amount breakdown<br/>
+                                ✓ Payment terms
+                              </div>
+                            </div>
+                            <div className="border border-green-200 rounded p-3 bg-white">
+                              <h4 className="font-medium">Standard Credit Note</h4>
+                              <p className="text-sm text-gray-600">For premium refunds and corrections</p>
+                              <div className="mt-2 text-xs text-green-700">
+                                ✓ Reference to original invoice<br/>
+                                ✓ Reason for credit<br/>
+                                ✓ Adjusted amounts<br/>
+                                ✓ New balance due
+                              </div>
+                            </div>
+                          </div>
+                          <Button variant="outline" className="w-full">
+                            <Eye className="h-4 w-4 mr-2" />
+                            Preview Templates
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <div className="border rounded-lg">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Premium ID</TableHead>
+                            <TableHead>Contract/Treaty</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Document Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {premiumBookings.map((premium) => (
+                            <TableRow key={premium.id}>
+                              <TableCell className="font-mono">{premium.id}</TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{premium.contractNumber}</p>
+                                  <p className="text-sm text-gray-600">{premium.treatyName}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell>{premium.currency} {premium.netAmount.toLocaleString()}</TableCell>
+                              <TableCell>
+                                <Badge className={getPaymentStatusColor(premium.paymentStatus)}>
+                                  {premium.paymentStatus}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex space-x-1">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => generateDocument('debit', premium.id)}
+                                  >
+                                    <FileText className="h-3 w-3 mr-1" />
+                                    Debit Note
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => generateDocument('credit', premium.id)}
+                                  >
+                                    <CreditCard className="h-3 w-3 mr-1" />
+                                    Credit Note
+                                  </Button>
+                                  <Button size="sm" variant="outline">
+                                    <Download className="h-3 w-3 mr-1" />
+                                    Download
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="payables" className="space-y-4">
@@ -343,222 +764,180 @@ const AccountingModule = () => {
                   </div>
                 </div>
 
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium mb-2">Payment Schedule</h4>
-                  <div className="space-y-2 text-sm">
-                    <p>• Next 7 days: USD 2.5M in scheduled payments</p>
-                    <p>• Next 30 days: USD 8.9M total payment obligations</p>
-                    <p>• Average payment terms: 45 days</p>
-                    <p>• Early payment discounts available: USD 150K potential savings</p>
-                  </div>
-                </div>
+                {/* Claims Management Section - Moved from Claims Module */}
+                {user?.userType === 'Finance' && (
+                  <Tabs defaultValue="manage-claims" className="space-y-4">
+                    <TabsList>
+                      <TabsTrigger value="manage-claims">Manage Claims</TabsTrigger>
+                      <TabsTrigger value="commissions">Commissions</TabsTrigger>
+                      <TabsTrigger value="other-payables">Other Payables</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="manage-claims" className="space-y-4">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Claims Management - Finance View</CardTitle>
+                          <CardDescription>Finance team access to approved claims for payment processing</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="border rounded-lg">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Claim Reference</TableHead>
+                                  <TableHead>Amount</TableHead>
+                                  <TableHead>Documents</TableHead>
+                                  <TableHead>Payment Status</TableHead>
+                                  <TableHead>Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {approvedClaims.map((claim) => (
+                                  <TableRow key={claim.claimNumber}>
+                                    <TableCell className="font-mono text-sm">{claim.claimNumber}</TableCell>
+                                    <TableCell>{claim.currency} {claim.claimAmount.toLocaleString()}</TableCell>
+                                    <TableCell>
+                                      <div className="flex space-x-1">
+                                        <Button size="sm" variant="outline">
+                                          <Download className="h-3 w-3 mr-1" />
+                                          Claim Advice
+                                        </Button>
+                                        <Button size="sm" variant="outline">
+                                          <Download className="h-3 w-3 mr-1" />
+                                          Payment Voucher
+                                        </Button>
+                                        <Button size="sm" variant="outline">
+                                          <Download className="h-3 w-3 mr-1" />
+                                          Debit Note
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Select defaultValue={claim.status}>
+                                        <SelectTrigger className="w-32">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="No Payment Made">No Payment</SelectItem>
+                                          <SelectItem value="Partial Payment">Partial</SelectItem>
+                                          <SelectItem value="Full Payment">Full Payment</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex space-x-1">
+                                        <Button size="sm">
+                                          <DollarSign className="h-3 w-3 mr-1" />
+                                          Record Payment
+                                        </Button>
+                                        <Button size="sm" variant="outline">
+                                          <CheckCircle className="h-3 w-3 mr-1" />
+                                          Update Status
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    <TabsContent value="commissions" className="space-y-4">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Commission Management</CardTitle>
+                          <CardDescription>Manage broker commissions and payments</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="bg-blue-50 p-4 rounded-lg">
+                                <p className="text-sm text-blue-600 font-medium">Total Commissions Due</p>
+                                <p className="text-2xl font-bold text-blue-900">USD 3.2M</p>
+                              </div>
+                              <div className="bg-green-50 p-4 rounded-lg">
+                                <p className="text-sm text-green-600 font-medium">Paid This Month</p>
+                                <p className="text-2xl font-bold text-green-900">USD 1.8M</p>
+                              </div>
+                              <div className="bg-orange-50 p-4 rounded-lg">
+                                <p className="text-sm text-orange-600 font-medium">Pending Payment</p>
+                                <p className="text-2xl font-bold text-orange-900">USD 1.4M</p>
+                              </div>
+                            </div>
+                            
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Broker</TableHead>
+                                  <TableHead>Commission Due</TableHead>
+                                  <TableHead>Due Date</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead>Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                <TableRow>
+                                  <TableCell>AON Tanzania</TableCell>
+                                  <TableCell>USD 450,000</TableCell>
+                                  <TableCell>2024-12-30</TableCell>
+                                  <TableCell><Badge variant="outline">Pending</Badge></TableCell>
+                                  <TableCell>
+                                    <Button size="sm">Pay Commission</Button>
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell>Marsh Tanzania</TableCell>
+                                  <TableCell>USD 325,000</TableCell>
+                                  <TableCell>2024-12-25</TableCell>
+                                  <TableCell><Badge variant="destructive">Overdue</Badge></TableCell>
+                                  <TableCell>
+                                    <Button size="sm">Pay Commission</Button>
+                                  </TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    <TabsContent value="other-payables" className="space-y-4">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Other Payables</CardTitle>
+                          <CardDescription>Manage other outstanding payables</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="bg-purple-50 p-4 rounded-lg">
+                                <p className="text-sm text-purple-600 font-medium">Retro Premiums</p>
+                                <p className="text-2xl font-bold text-purple-900">USD 1.5M</p>
+                              </div>
+                              <div className="bg-teal-50 p-4 rounded-lg">
+                                <p className="text-sm text-teal-600 font-medium">Operating Expenses</p>
+                                <p className="text-2xl font-bold text-teal-900">USD 0.5M</p>
+                              </div>
+                              <div className="bg-amber-50 p-4 rounded-lg">
+                                <p className="text-sm text-amber-600 font-medium">Other Liabilities</p>
+                                <p className="text-2xl font-bold text-amber-900">USD 0.3M</p>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                  </Tabs>
+                )}
               </div>
             </CardContent>
           </Card>
-
-          {/* Claims Management Section - Moved from Claims Module */}
-          {user?.userType === 'Finance' && (
-            <Tabs defaultValue="manage-claims" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="manage-claims">Manage Claims</TabsTrigger>
-                <TabsTrigger value="commissions">Commissions</TabsTrigger>
-                <TabsTrigger value="receivables-detail">Receivables Detail</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="manage-claims" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Claims Management - Finance View</CardTitle>
-                    <CardDescription>Finance team access to approved claims for payment processing</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="border rounded-lg">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Claim Reference</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>Documents</TableHead>
-                            <TableHead>Payment Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {approvedClaims.map((claim) => (
-                            <TableRow key={claim.claimNumber}>
-                              <TableCell className="font-mono text-sm">{claim.claimNumber}</TableCell>
-                              <TableCell>{claim.currency} {claim.claimAmount.toLocaleString()}</TableCell>
-                              <TableCell>
-                                <div className="flex space-x-1">
-                                  <Button size="sm" variant="outline">
-                                    <Download className="h-3 w-3 mr-1" />
-                                    Claim Advice
-                                  </Button>
-                                  <Button size="sm" variant="outline">
-                                    <Download className="h-3 w-3 mr-1" />
-                                    Payment Voucher
-                                  </Button>
-                                  <Button size="sm" variant="outline">
-                                    <Download className="h-3 w-3 mr-1" />
-                                    Debit Note
-                                  </Button>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Select defaultValue={claim.status}>
-                                  <SelectTrigger className="w-32">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="No Payment Made">No Payment</SelectItem>
-                                    <SelectItem value="Partial Payment">Partial</SelectItem>
-                                    <SelectItem value="Full Payment">Full Payment</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex space-x-1">
-                                  <Button size="sm">
-                                    <DollarSign className="h-3 w-3 mr-1" />
-                                    Record Payment
-                                  </Button>
-                                  <Button size="sm" variant="outline">
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Update Status
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="commissions" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Commission Management</CardTitle>
-                    <CardDescription>Manage broker commissions and payments</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-blue-50 p-4 rounded-lg">
-                          <p className="text-sm text-blue-600 font-medium">Total Commissions Due</p>
-                          <p className="text-2xl font-bold text-blue-900">USD 3.2M</p>
-                        </div>
-                        <div className="bg-green-50 p-4 rounded-lg">
-                          <p className="text-sm text-green-600 font-medium">Paid This Month</p>
-                          <p className="text-2xl font-bold text-green-900">USD 1.8M</p>
-                        </div>
-                        <div className="bg-orange-50 p-4 rounded-lg">
-                          <p className="text-sm text-orange-600 font-medium">Pending Payment</p>
-                          <p className="text-2xl font-bold text-orange-900">USD 1.4M</p>
-                        </div>
-                      </div>
-                      
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Broker</TableHead>
-                            <TableHead>Commission Due</TableHead>
-                            <TableHead>Due Date</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          <TableRow>
-                            <TableCell>AON Tanzania</TableCell>
-                            <TableCell>USD 450,000</TableCell>
-                            <TableCell>2024-12-30</TableCell>
-                            <TableCell><Badge variant="outline">Pending</Badge></TableCell>
-                            <TableCell>
-                              <Button size="sm">Pay Commission</Button>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell>Marsh Tanzania</TableCell>
-                            <TableCell>USD 325,000</TableCell>
-                            <TableCell>2024-12-25</TableCell>
-                            <TableCell><Badge variant="destructive">Overdue</Badge></TableCell>
-                            <TableCell>
-                              <Button size="sm">Pay Commission</Button>
-                            </TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="receivables-detail" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Receivables Management</CardTitle>
-                    <CardDescription>Track and manage outstanding receivables</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-purple-50 p-4 rounded-lg">
-                          <p className="text-sm text-purple-600 font-medium">Premium Receivables</p>
-                          <p className="text-2xl font-bold text-purple-900">USD 8.75M</p>
-                        </div>
-                        <div className="bg-teal-50 p-4 rounded-lg">
-                          <p className="text-sm text-teal-600 font-medium">Retro Receivables</p>
-                          <p className="text-2xl font-bold text-teal-900">USD 12.2M</p>
-                        </div>
-                        <div className="bg-amber-50 p-4 rounded-lg">
-                          <p className="text-sm text-amber-600 font-medium">Other Receivables</p>
-                          <p className="text-2xl font-bold text-amber-900">USD 2.1M</p>
-                        </div>
-                      </div>
-
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Debtor</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>Age (Days)</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          <TableRow>
-                            <TableCell>Century Insurance Ltd</TableCell>
-                            <TableCell>USD 2.5M</TableCell>
-                            <TableCell>15</TableCell>
-                            <TableCell><Badge variant="secondary">Premium</Badge></TableCell>
-                            <TableCell>
-                              <Button size="sm" variant="outline">Follow Up</Button>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell>Swiss Re</TableCell>
-                            <TableCell>USD 1.8M</TableCell>
-                            <TableCell>45</TableCell>
-                            <TableCell><Badge variant="outline">Retro Recovery</Badge></TableCell>
-                            <TableCell>
-                              <Button size="sm" variant="outline">Follow Up</Button>
-                            </TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          )}
         </TabsContent>
 
-        <TabsContent value="reports">
+        <TabsContent value="reports" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Financial Reports</CardTitle>
@@ -579,53 +958,13 @@ const AccountingModule = () => {
                     <DollarSign className="h-8 w-8 mb-2" />
                     <span>Balance Sheet</span>
                   </Button>
-                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center">
-                    <FileText className="h-8 w-8 mb-2" />
-                    <span>Cash Flow</span>
-                  </Button>
-                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center">
-                    <TrendingUp className="h-8 w-8 mb-2" />
-                    <span>Technical Account</span>
-                  </Button>
-                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center">
-                    <DollarSign className="h-8 w-8 mb-2" />
-                    <span>Regulatory Returns</span>
-                  </Button>
                 </div>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Trial Balance Preview</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Account</TableHead>
-                          <TableHead className="text-right">Debit</TableHead>
-                          <TableHead className="text-right">Credit</TableHead>
-                          <TableHead className="text-right">Balance</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {trialBalance.map((account, index) => (
-                          <TableRow key={index}>
-                            <TableCell className="font-medium">{account.account}</TableCell>
-                            <TableCell className="text-right">{account.debit !== "0" ? parseInt(account.debit).toLocaleString() : "-"}</TableCell>
-                            <TableCell className="text-right">{account.credit !== "0" ? parseInt(account.credit).toLocaleString() : "-"}</TableCell>
-                            <TableCell className="text-right font-medium">{parseInt(account.balance.replace('-', '')).toLocaleString()}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="ifrs17">
+        <TabsContent value="ifrs17" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>IFRS 17 Compliance</CardTitle>
@@ -653,24 +992,6 @@ const AccountingModule = () => {
                     <p className="text-sm text-amber-600 font-medium">LRC</p>
                     <p className="text-2xl font-bold text-amber-900">USD 89.4M</p>
                     <p className="text-xs text-amber-600">Liability for Remaining Coverage</p>
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 p-6 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-4">IFRS 17 Summary</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="font-medium mb-2">Measurement Approach:</p>
-                      <p>• Premium Allocation Approach (PAA) for short-duration contracts</p>
-                      <p>• General Measurement Model (GMM) for complex contracts</p>
-                      <p>• Variable Fee Approach (VFA) for participating contracts</p>
-                    </div>
-                    <div>
-                      <p className="font-medium mb-2">Key Metrics:</p>
-                      <p>• Insurance Revenue: USD 89.3M (current period)</p>
-                      <p>• Insurance Service Expenses: USD 84.5M</p>
-                      <p>• Net Insurance Financial Result: USD 4.8M</p>
-                    </div>
                   </div>
                 </div>
               </div>
