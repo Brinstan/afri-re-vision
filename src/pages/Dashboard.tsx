@@ -7,8 +7,8 @@ import { useAuth } from "../components/AuthContext";
 import ActuarialEngine from "../components/ActuarialEngine";
 import PricingSystem from "../components/PricingSystem";
 import AccountingModule from "../components/AccountingModule";
-import ClaimsSystemComprehensive from "../components/ClaimsSystemComprehensive";
-import TreatyManagementNew from "../components/TreatyManagementNew";
+import ClaimsModule from "../components/ClaimsModule";
+import TreatyManagement from "../components/TreatyManagement";
 import UnderwritingModule from "../components/UnderwritingModule";
 import IfrsReporting from "../components/IfrsReporting";
 import RetrocessionModule from "../components/RetrocessionModule";
@@ -39,9 +39,9 @@ const Dashboard = () => {
       case "accounting":
         return <AccountingModule />;
       case "claims":
-        return <ClaimsSystemComprehensive />;
+        return <ClaimsModule />;
       case "treaties":
-        return <TreatyManagementNew />;
+        return <TreatyManagement />;
       case "underwriting":
         return <UnderwritingModule />;
       case "ifrs":
@@ -84,10 +84,6 @@ const Dashboard = () => {
                     <Building className="mr-2 h-4 w-4" />
                     New Underwriting Contract
                   </Button>
-                  <Button onClick={() => setActiveModule("claims")} variant="outline" className="w-full justify-start">
-                    <FileText className="mr-2 h-4 w-4" />
-                    Process New Claim
-                  </Button>
                   <Button onClick={() => setActiveModule("actuarial")} variant="outline" className="w-full justify-start">
                     <Calculator className="mr-2 h-4 w-4" />
                     Run Actuarial Calculations
@@ -95,6 +91,10 @@ const Dashboard = () => {
                   <Button onClick={() => setActiveModule("pricing")} variant="outline" className="w-full justify-start">
                     <TrendingUp className="mr-2 h-4 w-4" />
                     Generate AI Pricing
+                  </Button>
+                  <Button onClick={() => setActiveModule("claims")} variant="outline" className="w-full justify-start">
+                    <FileText className="mr-2 h-4 w-4" />
+                    Process New Claim
                   </Button>
                   <Button onClick={() => setActiveModule("ifrs")} variant="outline" className="w-full justify-start">
                     <BookOpen className="mr-2 h-4 w-4" />
@@ -199,10 +199,10 @@ const Dashboard = () => {
             {[
               { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="h-4 w-4" /> },
               { id: 'underwriting', label: 'Underwriting', icon: <Building className="h-4 w-4" /> },
-              { id: 'claims', label: 'Claims System', icon: <FileText className="h-4 w-4" /> },
               { id: 'actuarial', label: 'Actuarial Engine', icon: <Calculator className="h-4 w-4" /> },
               { id: 'pricing', label: 'AI Pricing', icon: <TrendingUp className="h-4 w-4" /> },
               { id: 'accounting', label: 'Accounting', icon: <DollarSign className="h-4 w-4" /> },
+              { id: 'claims', label: 'Claims', icon: <FileText className="h-4 w-4" /> },
               { id: 'treaties', label: 'Treaties', icon: <Users className="h-4 w-4" /> },
               { id: 'retrocession', label: 'Retrocession', icon: <Shield className="h-4 w-4" /> },
               { id: 'ifrs', label: 'IFRS 17', icon: <BookOpen className="h-4 w-4" /> }
