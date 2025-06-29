@@ -349,133 +349,11 @@ const AccountingModule = () => {
         </TabsContent>
 
         <TabsContent value="receivables" className="space-y-4">
-          <Tabs defaultValue="claims-management" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="claims-management">Claims Management</TabsTrigger>
+          <Tabs defaultValue="commissions" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="commissions">Commissions</TabsTrigger>
               <TabsTrigger value="premium-receivables">Premium Receivables</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="claims-management" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Claims Payment Processing</CardTitle>
-                  <CardDescription>Process payments for approved claims with document management</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                        <p className="text-sm text-blue-600 font-medium">Total Outstanding Claims</p>
-                        <p className="text-2xl font-bold text-blue-900">{getApprovedClaims().length}</p>
-                      </div>
-                      <div className="bg-green-50 p-4 rounded-lg">
-                        <p className="text-sm text-green-600 font-medium">Total Amount Due</p>
-                        <p className="text-2xl font-bold text-green-900">
-                          USD {getApprovedClaims().reduce((sum, claim) => sum + claim.claimAmount, 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="bg-yellow-50 p-4 rounded-lg">
-                        <p className="text-sm text-yellow-600 font-medium">Expected Retro Recovery</p>
-                        <p className="text-2xl font-bold text-yellow-900">
-                          USD {getApprovedClaims().reduce((sum, claim) => sum + (claim.retroRecovery || 0), 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="bg-red-50 p-4 rounded-lg">
-                        <p className="text-sm text-red-600 font-medium">Net Exposure</p>
-                        <p className="text-2xl font-bold text-red-900">
-                          USD {getApprovedClaims().reduce((sum, claim) => sum + (claim.claimAmount - (claim.retroRecovery || 0)), 0).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Claim Reference</TableHead>
-                          <TableHead>Insured Name</TableHead>
-                          <TableHead>Claim Amount</TableHead>
-                          <TableHead>Retro Recovery</TableHead>
-                          <TableHead>Net Payable</TableHead>
-                          <TableHead>Payment Status</TableHead>
-                          <TableHead>Documents</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {getApprovedClaims().map((claim) => {
-                          const netPayable = claim.claimAmount - (claim.retroRecovery || 0);
-                          return (
-                            <TableRow key={claim.id}>
-                              <TableCell className="font-mono text-sm">{claim.claimNumber}</TableCell>
-                              <TableCell>{claim.insuredName}</TableCell>
-                              <TableCell>{claim.currency} {claim.claimAmount.toLocaleString()}</TableCell>
-                              <TableCell className="text-green-600">
-                                {claim.currency} {(claim.retroRecovery || 0).toLocaleString()}
-                              </TableCell>
-                              <TableCell className="font-medium">
-                                {claim.currency} {netPayable.toLocaleString()}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={claim.status === 'Outstanding' ? 'destructive' : 'default'}>
-                                  {claim.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex space-x-1">
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => downloadDocument("Claim Advice", claim.claimNumber)}
-                                  >
-                                    <Download className="h-3 w-3 mr-1" />
-                                    Advice
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => downloadDocument("Payment Voucher", claim.claimNumber)}
-                                  >
-                                    <Download className="h-3 w-3 mr-1" />
-                                    Voucher
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => downloadDocument("Debit Note", claim.claimNumber)}
-                                  >
-                                    <Download className="h-3 w-3 mr-1" />
-                                    Debit Note
-                                  </Button>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Button 
-                                  size="sm" 
-                                  onClick={() => handlePaymentProcessing(claim)}
-                                  disabled={claim.status === 'Full Payment'}
-                                >
-                                  <DollarSign className="h-3 w-3 mr-1" />
-                                  {claim.status === 'Full Payment' ? 'Paid' : 'Process Payment'}
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-
-                    {getApprovedClaims().length === 0 && (
-                      <div className="text-center py-8 text-gray-500">
-                        <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                        <p>No approved claims awaiting payment</p>
-                        <p className="text-sm">Claims will appear here once approved in the Claims module</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
 
             <TabsContent value="commissions" className="space-y-4">
               <Card>
@@ -620,44 +498,174 @@ const AccountingModule = () => {
         </TabsContent>
 
         <TabsContent value="payables" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Accounts Payable</CardTitle>
-              <CardDescription>Manage claims, commissions, and other payables</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-purple-50 p-4 rounded-lg">
-                    <p className="text-sm text-purple-600 font-medium">Total Payables</p>
-                    <p className="text-2xl font-bold text-purple-900">USD 18.3M</p>
-                  </div>
-                  <div className="bg-orange-50 p-4 rounded-lg">
-                    <p className="text-sm text-orange-600 font-medium">Claims Payable</p>
-                    <p className="text-2xl font-bold text-orange-900">USD 12.8M</p>
-                  </div>
-                  <div className="bg-indigo-50 p-4 rounded-lg">
-                    <p className="text-sm text-indigo-600 font-medium">Commissions</p>
-                    <p className="text-2xl font-bold text-indigo-900">USD 3.2M</p>
-                  </div>
-                  <div className="bg-pink-50 p-4 rounded-lg">
-                    <p className="text-sm text-pink-600 font-medium">Other Payables</p>
-                    <p className="text-2xl font-bold text-pink-900">USD 2.3M</p>
-                  </div>
-                </div>
+          <Tabs defaultValue="claims-management" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="claims-management">Claims Management</TabsTrigger>
+              <TabsTrigger value="other-payables">Other Payables</TabsTrigger>
+            </TabsList>
 
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium mb-2">Payment Schedule</h4>
-                  <div className="space-y-2 text-sm">
-                    <p>• Next 7 days: USD 2.5M in scheduled payments</p>
-                    <p>• Next 30 days: USD 8.9M total payment obligations</p>
-                    <p>• Average payment terms: 45 days</p>
-                    <p>• Early payment discounts available: USD 150K potential savings</p>
+            <TabsContent value="claims-management" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Claims Payment Processing</CardTitle>
+                  <CardDescription>Process payments for approved claims with document management</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <p className="text-sm text-blue-600 font-medium">Total Outstanding Claims</p>
+                        <p className="text-2xl font-bold text-blue-900">{getApprovedClaims().length}</p>
+                      </div>
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <p className="text-sm text-green-600 font-medium">Total Amount Due</p>
+                        <p className="text-2xl font-bold text-green-900">
+                          USD {getApprovedClaims().reduce((sum, claim) => sum + claim.claimAmount, 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="bg-yellow-50 p-4 rounded-lg">
+                        <p className="text-sm text-yellow-600 font-medium">Expected Retro Recovery</p>
+                        <p className="text-2xl font-bold text-yellow-900">
+                          USD {getApprovedClaims().reduce((sum, claim) => sum + (claim.retroRecovery || 0), 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="bg-red-50 p-4 rounded-lg">
+                        <p className="text-sm text-red-600 font-medium">Net Exposure</p>
+                        <p className="text-2xl font-bold text-red-900">
+                          USD {getApprovedClaims().reduce((sum, claim) => sum + (claim.claimAmount - (claim.retroRecovery || 0)), 0).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Claim Reference</TableHead>
+                          <TableHead>Insured Name</TableHead>
+                          <TableHead>Claim Amount</TableHead>
+                          <TableHead>Retro Recovery</TableHead>
+                          <TableHead>Net Payable</TableHead>
+                          <TableHead>Payment Status</TableHead>
+                          <TableHead>Documents</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {getApprovedClaims().map((claim) => {
+                          const netPayable = claim.claimAmount - (claim.retroRecovery || 0);
+                          return (
+                            <TableRow key={claim.id}>
+                              <TableCell className="font-mono text-sm">{claim.claimNumber}</TableCell>
+                              <TableCell>{claim.insuredName}</TableCell>
+                              <TableCell>{claim.currency} {claim.claimAmount.toLocaleString()}</TableCell>
+                              <TableCell className="text-green-600">
+                                {claim.currency} {(claim.retroRecovery || 0).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {claim.currency} {netPayable.toLocaleString()}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={claim.status === 'Outstanding' ? 'destructive' : 'default'}>
+                                  {claim.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex space-x-1">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => downloadDocument("Claim Advice", claim.claimNumber)}
+                                  >
+                                    <Download className="h-3 w-3 mr-1" />
+                                    Advice
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => downloadDocument("Payment Voucher", claim.claimNumber)}
+                                  >
+                                    <Download className="h-3 w-3 mr-1" />
+                                    Voucher
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => downloadDocument("Debit Note", claim.claimNumber)}
+                                  >
+                                    <Download className="h-3 w-3 mr-1" />
+                                    Debit Note
+                                  </Button>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => handlePaymentProcessing(claim)}
+                                  disabled={claim.status === 'Full Payment'}
+                                >
+                                  <DollarSign className="h-3 w-3 mr-1" />
+                                  {claim.status === 'Full Payment' ? 'Paid' : 'Process Payment'}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+
+                    {getApprovedClaims().length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                        <p>No approved claims awaiting payment</p>
+                        <p className="text-sm">Claims will appear here once approved in the Claims module</p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="other-payables" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Other Accounts Payable</CardTitle>
+                  <CardDescription>Manage commissions and other payables</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="bg-purple-50 p-4 rounded-lg">
+                        <p className="text-sm text-purple-600 font-medium">Total Payables</p>
+                        <p className="text-2xl font-bold text-purple-900">USD 18.3M</p>
+                      </div>
+                      <div className="bg-indigo-50 p-4 rounded-lg">
+                        <p className="text-sm text-indigo-600 font-medium">Commissions</p>
+                        <p className="text-2xl font-bold text-indigo-900">USD 3.2M</p>
+                      </div>
+                      <div className="bg-pink-50 p-4 rounded-lg">
+                        <p className="text-sm text-pink-600 font-medium">Other Payables</p>
+                        <p className="text-2xl font-bold text-pink-900">USD 2.3M</p>
+                      </div>
+                      <div className="bg-cyan-50 p-4 rounded-lg">
+                        <p className="text-sm text-cyan-600 font-medium">Overdue Items</p>
+                        <p className="text-2xl font-bold text-cyan-900">USD 0.8M</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">Payment Schedule</h4>
+                      <div className="space-y-2 text-sm">
+                        <p>• Next 7 days: USD 2.5M in scheduled payments</p>
+                        <p>• Next 30 days: USD 8.9M total payment obligations</p>
+                        <p>• Average payment terms: 45 days</p>
+                        <p>• Early payment discounts available: USD 150K potential savings</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="reports">
