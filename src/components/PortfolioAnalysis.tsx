@@ -65,28 +65,30 @@ const PortfolioAnalysis = () => {
     const lobAnalysis = {};
     
     treaties.forEach(treaty => {
-      treaty.lineOfBusiness.forEach(lob => {
-        if (!lobAnalysis[lob]) {
-          lobAnalysis[lob] = {
-            premium: 0,
-            claims: 0,
-            treatyCount: 0,
-            avgPremium: 0,
-            lossRatio: 0,
-            profitability: 'Good'
-          };
-        }
-        
-        lobAnalysis[lob].premium += treaty.premium;
-        lobAnalysis[lob].treatyCount += 1;
-        
-        // Calculate claims for this LOB
-        const treatyClaims = claims
-          .filter(claim => claim.treatyId === treaty.id)
-          .reduce((sum, claim) => sum + claim.claimAmount, 0);
-        
-        lobAnalysis[lob].claims += treatyClaims;
-      });
+      if (treaty.lineOfBusiness && Array.isArray(treaty.lineOfBusiness)) {
+        treaty.lineOfBusiness.forEach(lob => {
+          if (!lobAnalysis[lob]) {
+            lobAnalysis[lob] = {
+              premium: 0,
+              claims: 0,
+              treatyCount: 0,
+              avgPremium: 0,
+              lossRatio: 0,
+              profitability: 'Good'
+            };
+          }
+          
+          lobAnalysis[lob].premium += treaty.premium;
+          lobAnalysis[lob].treatyCount += 1;
+          
+          // Calculate claims for this LOB
+          const treatyClaims = claims
+            .filter(claim => claim.treatyId === treaty.id)
+            .reduce((sum, claim) => sum + claim.claimAmount, 0);
+          
+          lobAnalysis[lob].claims += treatyClaims;
+        });
+      }
     });
 
     // Calculate derived metrics
@@ -107,7 +109,7 @@ const PortfolioAnalysis = () => {
     const geoAnalysis = {};
     
     treaties.forEach(treaty => {
-      const country = treaty.country;
+      const country = treaty.country || 'Unknown';
       if (!geoAnalysis[country]) {
         geoAnalysis[country] = {
           premium: 0,
@@ -155,35 +157,40 @@ const PortfolioAnalysis = () => {
     const totalPremium = treaties.reduce((sum, treaty) => sum + treaty.premium, 0);
 
     // Concentration Risk (largest treaty as % of total)
-    const largestTreaty = Math.max(...treaties.map(t => t.premium));
-    riskMetrics.concentrationRisk = totalPremium > 0 ? (largestTreaty / totalPremium) * 100 : 0;
+    if (treaties.length > 0) {
+      const largestTreaty = Math.max(...treaties.map(t => t.premium));
+      riskMetrics.concentrationRisk = totalPremium > 0 ? (largestTreaty / totalPremium) * 100 : 0;
+    }
 
     // Geographic Risk (Herfindahl Index)
     const geoShares = Object.values(geoAnalysis).map(geo => geo.marketShare / 100);
     riskMetrics.geographicRisk = geoShares.reduce((sum, share) => sum + (share * share), 0) * 100;
 
     // LOB Risk (based on loss ratios)
-    const avgLossRatio = Object.values(lobAnalysis).reduce((sum, lob) => sum + lob.lossRatio, 0) / Object.keys(lobAnalysis).length;
-    riskMetrics.lobRisk = avgLossRatio;
+    const lobValues = Object.values(lobAnalysis);
+    if (lobValues.length > 0) {
+      const avgLossRatio = lobValues.reduce((sum, lob) => sum + lob.lossRatio, 0) / lobValues.length;
+      riskMetrics.lobRisk = avgLossRatio;
 
-    // Overall Risk Assessment
-    if (riskMetrics.concentrationRisk > 30 || riskMetrics.geographicRisk > 25 || avgLossRatio > 80) {
-      riskMetrics.overallRisk = 'High';
-    } else if (riskMetrics.concentrationRisk > 20 || riskMetrics.geographicRisk > 15 || avgLossRatio > 60) {
-      riskMetrics.overallRisk = 'Medium';
-    } else {
-      riskMetrics.overallRisk = 'Low';
-    }
+      // Overall Risk Assessment
+      if (riskMetrics.concentrationRisk > 30 || riskMetrics.geographicRisk > 25 || avgLossRatio > 80) {
+        riskMetrics.overallRisk = 'High';
+      } else if (riskMetrics.concentrationRisk > 20 || riskMetrics.geographicRisk > 15 || avgLossRatio > 60) {
+        riskMetrics.overallRisk = 'Medium';
+      } else {
+        riskMetrics.overallRisk = 'Low';
+      }
 
-    // Generate Recommendations
-    if (riskMetrics.concentrationRisk > 25) {
-      riskMetrics.recommendations.push("Consider diversifying large treaty exposures");
-    }
-    if (riskMetrics.geographicRisk > 20) {
-      riskMetrics.recommendations.push("Expand geographic diversification");
-    }
-    if (avgLossRatio > 75) {
-      riskMetrics.recommendations.push("Review pricing strategy for high loss ratio lines");
+      // Generate Recommendations
+      if (riskMetrics.concentrationRisk > 25) {
+        riskMetrics.recommendations.push("Consider diversifying large treaty exposures");
+      }
+      if (riskMetrics.geographicRisk > 20) {
+        riskMetrics.recommendations.push("Expand geographic diversification");
+      }
+      if (avgLossRatio > 75) {
+        riskMetrics.recommendations.push("Review pricing strategy for high loss ratio lines");
+      }
     }
 
     return riskMetrics;
@@ -191,7 +198,6 @@ const PortfolioAnalysis = () => {
 
   // Performance Trends
   const calculatePerformanceTrends = () => {
-    const currentYear = new Date().getFullYear();
     const trends = {
       premiumGrowth: 12.5,
       claimsGrowth: 8.3,
@@ -270,7 +276,7 @@ This analysis is based on current portfolio data and market conditions.
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Portfolio_Analysis_${timeframe}_${new Date().toISOString().split('T')[0]}.${format}`;
+    a.download = `Portfolio_Analysis_${timeframe}_${new Date().toISOString().split('T')[0]}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -419,7 +425,7 @@ This analysis is based on current portfolio data and market conditions.
               <CardContent>
                 <div className="text-2xl font-bold">{metrics.combinedRatio.toFixed(1)}%</div>
                 <p className="text-xs text-muted-foreground">
-                  Target: <95%
+                  Target: &lt;95%
                 </p>
               </CardContent>
             </Card>
