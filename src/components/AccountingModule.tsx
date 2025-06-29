@@ -8,10 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/sonner";
-import { DollarSign, FileText, CreditCard, TrendingUp, Download, Plus, Eye, CheckCircle, AlertTriangle, Users, Calculator, Edit, Save, X, Upload, Calendar, Target, BarChart3, PieChart, TrendingDown } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { DollarSign, FileText, CreditCard, TrendingUp, Download, Plus, Eye, CheckCircle, AlertTriangle, Users, Calculator, Building, Search, Filter, Calendar, PieChart, BarChart3, FileSpreadsheet, Printer } from "lucide-react";
 import { useDataStore } from './DataStore';
 
 const AccountingModule = () => {
@@ -21,28 +20,95 @@ const AccountingModule = () => {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
-  const [approverName, setApproverName] = useState("");
-  const [paymentReference, setPaymentReference] = useState("");
   
   // Investment states
   const [isInvestmentDialogOpen, setIsInvestmentDialogOpen] = useState(false);
+  const [isViewInvestmentDialogOpen, setIsViewInvestmentDialogOpen] = useState(false);
   const [selectedInvestment, setSelectedInvestment] = useState(null);
-  const [isEditingInvestment, setIsEditingInvestment] = useState(false);
-  const [investmentFormData, setInvestmentFormData] = useState({});
-  const [isNewInvestment, setIsNewInvestment] = useState(false);
-  
-  // Premium receivables states
-  const [isPremiumPaymentDialogOpen, setIsPremiumPaymentDialogOpen] = useState(false);
-  const [selectedPremiumBooking, setSelectedPremiumBooking] = useState(null);
-  const [premiumPaymentAmount, setPremiumPaymentAmount] = useState("");
-  const [premiumPaymentStatus, setPremiumPaymentStatus] = useState("");
-  const [premiumApproverName, setPremiumApproverName] = useState("");
-  const [premiumPaymentReference, setPremiumPaymentReference] = useState("");
+  const [investmentFormData, setInvestmentFormData] = useState({
+    investmentEntity: '',
+    entityType: '',
+    investmentType: '',
+    amount: '',
+    expectedReturn: '',
+    duration: '',
+    riskLevel: '',
+    description: '',
+    investmentDate: new Date().toISOString().split('T')[0],
+    maturityDate: '',
+    status: 'Active'
+  });
 
-  // Claims validation state
-  const [claimValidationAlert, setClaimValidationAlert] = useState(null);
+  // Report generation states
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportFilters, setReportFilters] = useState({
+    startDate: '2024-01-01',
+    endDate: '2024-12-31',
+    reportType: 'all'
+  });
 
-  const { claims, updateClaim, treaties, updateTreaty } = useDataStore();
+  const { claims, updateClaim } = useDataStore();
+
+  // Sample investment data with entity information
+  const [investments, setInvestments] = useState([
+    {
+      id: 1,
+      investmentEntity: "Tanzania Government Bonds",
+      entityType: "Government",
+      investmentType: "Bonds",
+      amount: 50000000,
+      expectedReturn: 8.5,
+      actualReturn: 8.2,
+      duration: "5 years",
+      riskLevel: "Low",
+      status: "Active",
+      investmentDate: "2024-01-15",
+      maturityDate: "2029-01-15",
+      description: "Government treasury bonds for stable returns"
+    },
+    {
+      id: 2,
+      investmentEntity: "Vodacom Tanzania (VODA)",
+      entityType: "Corporation",
+      investmentType: "Stocks",
+      amount: 25000000,
+      expectedReturn: 12.0,
+      actualReturn: 14.5,
+      duration: "Long-term",
+      riskLevel: "Medium",
+      status: "Active",
+      investmentDate: "2024-03-10",
+      maturityDate: "N/A",
+      description: "Blue-chip telecommunications stock investment"
+    },
+    {
+      id: 3,
+      investmentEntity: "CRDB Bank Fixed Deposit",
+      entityType: "Financial Institution",
+      investmentType: "Fixed Deposits",
+      amount: 15000000,
+      expectedReturn: 6.5,
+      actualReturn: 6.5,
+      duration: "2 years",
+      riskLevel: "Low",
+      status: "Active",
+      investmentDate: "2024-06-01",
+      maturityDate: "2026-06-01",
+      description: "Secure fixed deposit with guaranteed returns"
+    }
+  ]);
+
+  // Entity suggestions for autocomplete
+  const entitySuggestions = [
+    { name: "Tanzania Government Bonds", type: "Government" },
+    { name: "Vodacom Tanzania (VODA)", type: "Corporation" },
+    { name: "CRDB Bank", type: "Financial Institution" },
+    { name: "NMB Bank", type: "Financial Institution" },
+    { name: "Dangote Cement (DCEM)", type: "Corporation" },
+    { name: "Tanzania Breweries (TBL)", type: "Corporation" },
+    { name: "Bank of Tanzania Bills", type: "Government" },
+    { name: "Precision Air (PAL)", type: "Corporation" }
+  ];
 
   // Sample financial data
   const financialSummary = [
@@ -51,14 +117,14 @@ const AccountingModule = () => {
     { metric: "Claims Incurred", amount: "62,175,000", change: "-2.1%", status: "positive" },
     { metric: "Commission Expense", amount: "22,312,500", change: "+3.8%", status: "neutral" },
     { metric: "Underwriting Result", amount: "4,762,500", change: "+15.2%", status: "positive" },
-    { metric: "Investment Income", amount: "8,450,000", change: "+12.3%", status: "positive" }
+    { metric: "Technical Reserves", amount: "198,500,000", change: "+4.7%", status: "neutral" }
   ];
 
   const recentTransactions = [
     { date: "2024-12-20", type: "Premium Receipt", reference: "PR-2024-1205", amount: "2,500,000", currency: "USD", status: "Completed" },
     { date: "2024-12-19", type: "Claim Payment", reference: "CP-2024-0892", amount: "-1,850,000", currency: "USD", status: "Completed" },
     { date: "2024-12-18", type: "Commission Payment", reference: "COM-2024-0445", amount: "-325,000", currency: "USD", status: "Pending" },
-    { date: "2024-12-17", type: "Investment Income", reference: "INV-2024-0167", amount: "750,000", currency: "USD", status: "Completed" },
+    { date: "2024-12-17", type: "Retro Receipt", reference: "RR-2024-0167", amount: "750,000", currency: "USD", status: "Completed" },
     { date: "2024-12-16", type: "Premium Receipt", reference: "PR-2024-1204", amount: "1,200,000", currency: "USD", status: "Completed" }
   ];
 
@@ -66,90 +132,19 @@ const AccountingModule = () => {
     { type: "Premium Due", party: "ABC Insurance Ltd", amount: "850,000", dueDate: "2024-12-25", overdue: false },
     { type: "Commission Payable", party: "XYZ Brokers", amount: "125,000", dueDate: "2024-12-22", overdue: true },
     { type: "Claim Settlement", party: "DEF Insurance", amount: "2,200,000", dueDate: "2024-12-28", overdue: false },
-    { type: "Investment Maturity", party: "Government Bonds", amount: "5,000,000", dueDate: "2024-12-30", overdue: false }
+    { type: "Retro Commission", party: "Global Re", amount: "450,000", dueDate: "2024-12-30", overdue: false }
   ];
 
-  // Sample premium receivables data
-  const [premiumReceivables] = useState([
-    {
-      id: 1,
-      treatyId: "1",
-      treatyName: "Motor Treaty 2024",
-      premiumAmount: 25500000,
-      paidAmount: 25500000,
-      outstandingAmount: 0,
-      currency: "USD",
-      status: "Full Payment",
-      lastPaymentDate: "2024-01-15",
-      approver: "John Smith",
-      paymentReference: "PAY-2024-001"
-    },
-    {
-      id: 2,
-      treatyId: "2", 
-      treatyName: "Property XOL 2024",
-      premiumAmount: 18750000,
-      paidAmount: 12000000,
-      outstandingAmount: 6750000,
-      currency: "USD",
-      status: "Partial Payment",
-      lastPaymentDate: "2024-06-15",
-      approver: "Sarah Johnson",
-      paymentReference: "PAY-2024-002"
-    }
-  ]);
-
-  // Sample investment data
-  const [investments, setInvestments] = useState([
-    {
-      id: 1,
-      investmentType: "Government Bonds",
-      investmentDate: "2024-01-15",
-      amountAllocated: 10000000,
-      expectedReturnRate: 8.5,
-      expectedReturnAmount: 850000,
-      maturityDate: "2025-01-15",
-      riskLevel: "Low",
-      description: "5-year Treasury Bonds",
-      status: "Active",
-      actualReturns: 425000,
-      investmentManager: "Central Bank",
-      notes: "Quarterly interest payments",
-      performanceRatio: 1.05
-    },
-    {
-      id: 2,
-      investmentType: "Corporate Bonds",
-      investmentDate: "2024-03-10",
-      amountAllocated: 5000000,
-      expectedReturnRate: 12.0,
-      expectedReturnAmount: 600000,
-      maturityDate: "2026-03-10",
-      riskLevel: "Medium",
-      description: "AAA-rated Corporate Bonds",
-      status: "Active",
-      actualReturns: 200000,
-      investmentManager: "Investment Bank Ltd",
-      notes: "Semi-annual coupon payments",
-      performanceRatio: 1.12
-    },
-    {
-      id: 3,
-      investmentType: "Fixed Deposits",
-      investmentDate: "2024-06-01",
-      amountAllocated: 8000000,
-      expectedReturnRate: 6.5,
-      expectedReturnAmount: 520000,
-      maturityDate: "2025-06-01",
-      riskLevel: "Low",
-      description: "12-month Fixed Deposit",
-      status: "Active",
-      actualReturns: 260000,
-      investmentManager: "Commercial Bank",
-      notes: "Monthly interest payments",
-      performanceRatio: 0.98
-    }
-  ]);
+  const trialBalance = [
+    { account: "Cash and Bank", debit: "15,500,000", credit: "0", balance: "15,500,000" },
+    { account: "Premium Receivables", debit: "8,750,000", credit: "0", balance: "8,750,000" },
+    { account: "Reinsurance Receivables", debit: "12,200,000", credit: "0", balance: "12,200,000" },
+    { account: "Technical Reserves", debit: "0", credit: "198,500,000", balance: "-198,500,000" },
+    { account: "Premium Income", debit: "0", credit: "125,500,000", balance: "-125,500,000" },
+    { account: "Claims Expense", debit: "62,175,000", credit: "0", balance: "62,175,000" },
+    { account: "Commission Expense", debit: "22,312,500", credit: "0", balance: "22,312,500" },
+    { account: "Reinsurance Premium", debit: "36,250,000", credit: "0", balance: "36,250,000" }
+  ];
 
   // Sample commission data
   const commissionData = [
@@ -193,60 +188,7 @@ const AccountingModule = () => {
     return claims.filter(claim => claim.status === 'Outstanding' || claim.status === 'Approved');
   };
 
-  // Claims validation function
-  const validateClaimAgainstTreaty = (claim) => {
-    const treaty = treaties.find(t => t.id === claim.treatyId);
-    if (!treaty || !treaty.layers) {
-      setClaimValidationAlert({
-        type: "error",
-        title: "Treaty Validation Error",
-        message: "Unable to validate claim - treaty information not found or incomplete."
-      });
-      return false;
-    }
-
-    // Calculate total treaty capacity
-    const totalCapacity = treaty.layers.reduce((sum, layer) => sum + layer.limit, 0);
-    
-    // Calculate current utilization (sum of all claims for this treaty)
-    const treatyClaims = claims.filter(c => c.treatyId === claim.treatyId);
-    const currentUtilization = treatyClaims.reduce((sum, c) => sum + c.claimAmount, 0);
-    
-    // Calculate remaining capacity
-    const remainingCapacity = totalCapacity - currentUtilization;
-    
-    // Check if new claim exceeds remaining capacity
-    if (claim.claimAmount > remainingCapacity) {
-      const excessAmount = claim.claimAmount - remainingCapacity;
-      const utilizationPercentage = ((currentUtilization / totalCapacity) * 100).toFixed(1);
-      
-      setClaimValidationAlert({
-        type: "warning",
-        title: "Treaty Capacity Exceeded",
-        message: `This claim exceeds the remaining treaty capacity.`,
-        details: {
-          treatyName: treaty.treatyName,
-          totalCapacity: totalCapacity,
-          currentUtilization: currentUtilization,
-          utilizationPercentage: utilizationPercentage,
-          remainingCapacity: remainingCapacity,
-          claimAmount: claim.claimAmount,
-          excessAmount: excessAmount,
-          currency: claim.currency
-        }
-      });
-      return false;
-    }
-
-    return true;
-  };
-
   const handlePaymentProcessing = (claim) => {
-    // Validate claim against treaty capacity first
-    if (!validateClaimAgainstTreaty(claim)) {
-      return; // Stop processing if validation fails
-    }
-
     setSelectedClaim(claim);
     setPaymentAmount(claim.claimAmount.toString());
     setPaymentStatus("Full Payment");
@@ -254,8 +196,8 @@ const AccountingModule = () => {
   };
 
   const processPayment = () => {
-    if (!selectedClaim || !paymentAmount || !approverName || !paymentReference) {
-      toast.error("Please fill in all required fields including approver name and payment reference");
+    if (!selectedClaim || !paymentAmount) {
+      toast.error("Please enter payment amount");
       return;
     }
 
@@ -276,9 +218,7 @@ const AccountingModule = () => {
     updateClaim(selectedClaim.id, {
       status: newStatus,
       paidAmount: amount,
-      paymentDate: paymentDate,
-      approver: approverName,
-      paymentReference: paymentReference
+      paymentDate: paymentDate
     });
 
     toast.success(`Payment of ${selectedClaim.currency} ${amount.toLocaleString()} processed successfully`);
@@ -286,156 +226,150 @@ const AccountingModule = () => {
     setIsPaymentDialogOpen(false);
     setSelectedClaim(null);
     setPaymentAmount("");
-    setApproverName("");
-    setPaymentReference("");
-    setClaimValidationAlert(null); // Clear any validation alerts
-  };
-
-  // Premium payment processing
-  const handlePremiumPaymentProcessing = (booking) => {
-    setSelectedPremiumBooking(booking);
-    setPremiumPaymentAmount(booking.outstandingAmount.toString());
-    setPremiumPaymentStatus(booking.outstandingAmount > 0 ? "Partial Payment" : "Full Payment");
-    setIsPremiumPaymentDialogOpen(true);
-  };
-
-  const processPremiumPayment = () => {
-    if (!selectedPremiumBooking || !premiumPaymentAmount || !premiumApproverName || !premiumPaymentReference) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-
-    const amount = parseFloat(premiumPaymentAmount);
-    toast.success(`Premium payment of ${selectedPremiumBooking.currency} ${amount.toLocaleString()} processed successfully`);
-    
-    setIsPremiumPaymentDialogOpen(false);
-    setSelectedPremiumBooking(null);
-    setPremiumPaymentAmount("");
-    setPremiumApproverName("");
-    setPremiumPaymentReference("");
   };
 
   // Investment management functions
+  const handleNewInvestment = () => {
+    setInvestmentFormData({
+      investmentEntity: '',
+      entityType: '',
+      investmentType: '',
+      amount: '',
+      expectedReturn: '',
+      duration: '',
+      riskLevel: '',
+      description: '',
+      investmentDate: new Date().toISOString().split('T')[0],
+      maturityDate: '',
+      status: 'Active'
+    });
+    setIsInvestmentDialogOpen(true);
+  };
+
+  const handleSaveInvestment = () => {
+    // Validation
+    if (!investmentFormData.investmentEntity || !investmentFormData.entityType || !investmentFormData.investmentType || !investmentFormData.amount) {
+      toast.error("Please fill in all required fields including Investment Entity");
+      return;
+    }
+
+    // Check for duplicate entity
+    const existingInvestment = investments.find(inv => 
+      inv.investmentEntity.toLowerCase() === investmentFormData.investmentEntity.toLowerCase() &&
+      inv.investmentType === investmentFormData.investmentType
+    );
+
+    if (existingInvestment) {
+      toast.error("Investment with this entity and type already exists");
+      return;
+    }
+
+    const newInvestment = {
+      id: Date.now(),
+      ...investmentFormData,
+      amount: parseFloat(investmentFormData.amount),
+      expectedReturn: parseFloat(investmentFormData.expectedReturn),
+      actualReturn: 0
+    };
+
+    setInvestments([...investments, newInvestment]);
+    toast.success("Investment created successfully");
+    setIsInvestmentDialogOpen(false);
+  };
+
   const handleViewInvestment = (investment) => {
     setSelectedInvestment(investment);
-    setIsEditingInvestment(false);
-    setIsInvestmentDialogOpen(true);
+    setIsViewInvestmentDialogOpen(true);
   };
 
-  const handleEditInvestment = (investment) => {
+  const handleUpdateInvestment = (investment) => {
     setSelectedInvestment(investment);
     setInvestmentFormData({
+      investmentEntity: investment.investmentEntity,
+      entityType: investment.entityType,
       investmentType: investment.investmentType,
-      investmentDate: investment.investmentDate,
-      amountAllocated: investment.amountAllocated,
-      expectedReturnRate: investment.expectedReturnRate,
-      maturityDate: investment.maturityDate,
+      amount: investment.amount.toString(),
+      expectedReturn: investment.expectedReturn.toString(),
+      duration: investment.duration,
       riskLevel: investment.riskLevel,
       description: investment.description,
-      status: investment.status,
-      actualReturns: investment.actualReturns,
-      investmentManager: investment.investmentManager,
-      notes: investment.notes
+      investmentDate: investment.investmentDate,
+      maturityDate: investment.maturityDate,
+      status: investment.status
     });
-    setIsEditingInvestment(true);
     setIsInvestmentDialogOpen(true);
   };
 
-  const handleNewInvestment = () => {
-    setSelectedInvestment(null);
-    setInvestmentFormData({
-      investmentType: "",
-      investmentDate: new Date().toISOString().split('T')[0],
-      amountAllocated: "",
-      expectedReturnRate: "",
-      maturityDate: "",
-      riskLevel: "Low",
-      description: "",
-      status: "Active",
-      actualReturns: 0,
-      investmentManager: "",
-      notes: ""
-    });
-    setIsEditingInvestment(true);
-    setIsNewInvestment(true);
-    setIsInvestmentDialogOpen(true);
-  };
-
-  const saveInvestment = () => {
-    // Validation
-    if (!investmentFormData.investmentType || !investmentFormData.amountAllocated || !investmentFormData.expectedReturnRate) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-
-    const amount = parseFloat(investmentFormData.amountAllocated);
-    const rate = parseFloat(investmentFormData.expectedReturnRate);
+  // Report generation functions
+  const generateReport = async (reportType) => {
+    setIsGeneratingReport(true);
     
-    if (isNaN(amount) || amount <= 0) {
-      toast.error("Please enter a valid investment amount");
-      return;
-    }
-
-    if (isNaN(rate) || rate < 0 || rate > 100) {
-      toast.error("Please enter a valid return rate (0-100%)");
-      return;
-    }
-
-    const expectedReturnAmount = (amount * rate) / 100;
-
-    if (isNewInvestment) {
-      // Add new investment
-      const newInvestment = {
-        id: Date.now(),
-        ...investmentFormData,
-        amountAllocated: amount,
-        expectedReturnRate: rate,
-        expectedReturnAmount: expectedReturnAmount,
-        performanceRatio: 1.0
+    try {
+      // Simulate report generation
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const reportData = {
+        'trial-balance': {
+          title: 'Trial Balance Report',
+          data: trialBalance,
+          period: selectedPeriod
+        },
+        'profit-loss': {
+          title: 'Profit & Loss Statement',
+          data: financialSummary,
+          period: selectedPeriod
+        },
+        'balance-sheet': {
+          title: 'Balance Sheet',
+          data: [...trialBalance, ...financialSummary],
+          period: selectedPeriod
+        },
+        'cash-flow': {
+          title: 'Cash Flow Statement',
+          data: recentTransactions,
+          period: selectedPeriod
+        },
+        'technical-account': {
+          title: 'Technical Account',
+          data: [...financialSummary, ...commissionData],
+          period: selectedPeriod
+        },
+        'regulatory-returns': {
+          title: 'Regulatory Returns',
+          data: [...financialSummary, ...trialBalance],
+          period: selectedPeriod
+        }
       };
-      setInvestments([...investments, newInvestment]);
-      toast.success("New investment added successfully");
-    } else {
-      // Update existing investment
-      setInvestments(investments.map(inv => 
-        inv.id === selectedInvestment.id 
-          ? { 
-              ...inv, 
-              ...investmentFormData, 
-              amountAllocated: amount,
-              expectedReturnRate: rate,
-              expectedReturnAmount: expectedReturnAmount
-            }
-          : inv
-      ));
-      toast.success("Investment updated successfully");
+
+      const report = reportData[reportType];
+      
+      // Create downloadable content
+      const reportContent = `
+${report.title}
+Period: ${report.period}
+Generated: ${new Date().toLocaleString()}
+
+${JSON.stringify(report.data, null, 2)}
+      `;
+
+      // Create and download file
+      const blob = new Blob([reportContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${report.title.replace(/\s+/g, '_')}_${selectedPeriod}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(`${report.title} generated and downloaded successfully`);
+    } catch (error) {
+      toast.error("Failed to generate report");
+    } finally {
+      setIsGeneratingReport(false);
     }
-
-    setIsInvestmentDialogOpen(false);
-    setIsEditingInvestment(false);
-    setIsNewInvestment(false);
-    setSelectedInvestment(null);
-    setInvestmentFormData({});
   };
-
-  const calculateInvestmentMetrics = () => {
-    const totalInvested = investments.reduce((sum, inv) => sum + inv.amountAllocated, 0);
-    const totalExpectedReturns = investments.reduce((sum, inv) => sum + inv.expectedReturnAmount, 0);
-    const totalActualReturns = investments.reduce((sum, inv) => sum + inv.actualReturns, 0);
-    const averageReturnRate = investments.length > 0 ? 
-      investments.reduce((sum, inv) => sum + inv.expectedReturnRate, 0) / investments.length : 0;
-    const performanceRatio = totalExpectedReturns > 0 ? totalActualReturns / totalExpectedReturns : 0;
-
-    return {
-      totalInvested,
-      totalExpectedReturns,
-      totalActualReturns,
-      averageReturnRate,
-      performanceRatio
-    };
-  };
-
-  const investmentMetrics = calculateInvestmentMetrics();
 
   const downloadDocument = (type, claimNumber) => {
     // Simulate document download
@@ -447,7 +381,7 @@ const AccountingModule = () => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Integrated Accounting System</h2>
-          <p className="text-gray-600">Complete financial management with IFRS 17 compliance and enhanced investment tracking</p>
+          <p className="text-gray-600">Complete financial management with IFRS 17 compliance and claims payment processing</p>
         </div>
         <div className="flex space-x-2">
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
@@ -467,38 +401,6 @@ const AccountingModule = () => {
         </div>
       </div>
 
-      {/* Claims Validation Alert */}
-      {claimValidationAlert && (
-        <Alert className={claimValidationAlert.type === "error" ? "border-red-500 bg-red-50" : "border-yellow-500 bg-yellow-50"}>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            <div className="space-y-2">
-              <p className="font-semibold">{claimValidationAlert.title}</p>
-              <p>{claimValidationAlert.message}</p>
-              {claimValidationAlert.details && (
-                <div className="bg-white p-3 rounded border mt-2">
-                  <p className="font-medium">Treaty: {claimValidationAlert.details.treatyName}</p>
-                  <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-                    <p>Total Capacity: {claimValidationAlert.details.currency} {claimValidationAlert.details.totalCapacity.toLocaleString()}</p>
-                    <p>Current Utilization: {claimValidationAlert.details.utilizationPercentage}%</p>
-                    <p>Remaining Capacity: {claimValidationAlert.details.currency} {claimValidationAlert.details.remainingCapacity.toLocaleString()}</p>
-                    <p className="text-red-600 font-medium">Excess Amount: {claimValidationAlert.details.currency} {claimValidationAlert.details.excessAmount.toLocaleString()}</p>
-                  </div>
-                </div>
-              )}
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => setClaimValidationAlert(null)}
-                className="mt-2"
-              >
-                Dismiss
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
-
       <Tabs defaultValue="dashboard" className="space-y-4">
         <TabsList>
           <TabsTrigger value="dashboard">Financial Dashboard</TabsTrigger>
@@ -507,6 +409,7 @@ const AccountingModule = () => {
           <TabsTrigger value="payables">Payables</TabsTrigger>
           <TabsTrigger value="investments">Investments</TabsTrigger>
           <TabsTrigger value="reports">Financial Reports</TabsTrigger>
+          <TabsTrigger value="ifrs17">IFRS 17</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-4">
@@ -534,7 +437,7 @@ const AccountingModule = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Recent Transactions</CardTitle>
-                <CardDescription>Latest financial transactions including investment income</CardDescription>
+                <CardDescription>Latest financial transactions including claim payments</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -542,7 +445,7 @@ const AccountingModule = () => {
                     <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className={`w-2 h-2 rounded-full ${
-                          transaction.type.includes('Receipt') || transaction.type.includes('Income') ? 'bg-green-500' : 'bg-red-500'
+                          transaction.type.includes('Receipt') ? 'bg-green-500' : 'bg-red-500'
                         }`} />
                         <div>
                           <p className="text-sm font-medium">{transaction.type}</p>
@@ -572,7 +475,7 @@ const AccountingModule = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Outstanding Items</CardTitle>
-                <CardDescription>Pending receivables, payables, and investment maturities</CardDescription>
+                <CardDescription>Pending receivables and payables including claims</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -668,271 +571,11 @@ const AccountingModule = () => {
         </TabsContent>
 
         <TabsContent value="receivables" className="space-y-4">
-          <Tabs defaultValue="premium-receivables" className="space-y-4">
+          <Tabs defaultValue="commissions" className="space-y-4">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="premium-receivables">Premium Receivables</TabsTrigger>
-              <TabsTrigger value="other-receivables">Other Receivables</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="premium-receivables" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Premium Receivables Management</CardTitle>
-                  <CardDescription>Track and manage premium payments from treaties with approval workflow</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                        <p className="text-sm text-blue-600 font-medium">Total Premium Receivables</p>
-                        <p className="text-2xl font-bold text-blue-900">
-                          USD {premiumReceivables.reduce((sum, pr) => sum + pr.premiumAmount, 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="bg-green-50 p-4 rounded-lg">
-                        <p className="text-sm text-green-600 font-medium">Total Paid</p>
-                        <p className="text-2xl font-bold text-green-900">
-                          USD {premiumReceivables.reduce((sum, pr) => sum + pr.paidAmount, 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="bg-orange-50 p-4 rounded-lg">
-                        <p className="text-sm text-orange-600 font-medium">Outstanding</p>
-                        <p className="text-2xl font-bold text-orange-900">
-                          USD {premiumReceivables.reduce((sum, pr) => sum + pr.outstandingAmount, 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="bg-purple-50 p-4 rounded-lg">
-                        <p className="text-sm text-purple-600 font-medium">Collection Rate</p>
-                        <p className="text-2xl font-bold text-purple-900">
-                          {((premiumReceivables.reduce((sum, pr) => sum + pr.paidAmount, 0) / 
-                             premiumReceivables.reduce((sum, pr) => sum + pr.premiumAmount, 0)) * 100).toFixed(1)}%
-                        </p>
-                      </div>
-                    </div>
-
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Treaty Name</TableHead>
-                          <TableHead>Premium Amount</TableHead>
-                          <TableHead>Paid Amount</TableHead>
-                          <TableHead>Outstanding</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Last Payment</TableHead>
-                          <TableHead>Approver</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {premiumReceivables.map((booking) => (
-                          <TableRow key={booking.id}>
-                            <TableCell className="font-medium">{booking.treatyName}</TableCell>
-                            <TableCell>{booking.currency} {booking.premiumAmount.toLocaleString()}</TableCell>
-                            <TableCell className="text-green-600">{booking.currency} {booking.paidAmount.toLocaleString()}</TableCell>
-                            <TableCell className={booking.outstandingAmount > 0 ? 'text-red-600 font-medium' : 'text-gray-500'}>
-                              {booking.currency} {booking.outstandingAmount.toLocaleString()}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={
-                                booking.status === 'Full Payment' ? 'secondary' : 
-                                booking.status === 'Partial Payment' ? 'default' : 'destructive'
-                              }>
-                                {booking.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{booking.lastPaymentDate}</TableCell>
-                            <TableCell>{booking.approver}</TableCell>
-                            <TableCell>
-                              <div className="flex space-x-1">
-                                <Button size="sm" variant="outline">
-                                  <Eye className="h-3 w-3 mr-1" />
-                                  View
-                                </Button>
-                                {booking.outstandingAmount > 0 && (
-                                  <Button size="sm" onClick={() => handlePremiumPaymentProcessing(booking)}>
-                                    <DollarSign className="h-3 w-3 mr-1" />
-                                    Process Payment
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="other-receivables" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Other Receivables</CardTitle>
-                  <CardDescription>Manage reinsurance and other receivables</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                        <p className="text-sm text-blue-600 font-medium">Total Receivables</p>
-                        <p className="text-2xl font-bold text-blue-900">USD 20.95M</p>
-                      </div>
-                      <div className="bg-green-50 p-4 rounded-lg">
-                        <p className="text-sm text-green-600 font-medium">Current (0-30 days)</p>
-                        <p className="text-2xl font-bold text-green-900">USD 15.2M</p>
-                      </div>
-                      <div className="bg-yellow-50 p-4 rounded-lg">
-                        <p className="text-sm text-yellow-600 font-medium">Overdue (31-90 days)</p>
-                        <p className="text-2xl font-bold text-yellow-900">USD 4.1M</p>
-                      </div>
-                      <div className="bg-red-50 p-4 rounded-lg">
-                        <p className="text-sm text-red-600 font-medium">Past Due (90+ days)</p>
-                        <p className="text-2xl font-bold text-red-900">USD 1.65M</p>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <h4 className="font-medium mb-2">Aging Analysis</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p>• Reinsurance receivables aging shows healthy collection pattern</p>
-                          <p>• 72.5% of receivables are current (within 30 days)</p>
-                          <p>• Retrocession receivables total USD 12.2M</p>
-                        </div>
-                        <div>
-                          <p>• Average collection period: 35 days</p>
-                          <p>• Bad debt provision: 2.1% of total receivables</p>
-                          <p>• Foreign exchange exposure: USD 8.5M</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
-
-        <TabsContent value="payables" className="space-y-4">
-          <Tabs defaultValue="claims-payables" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="claims-payables">Claims Payables</TabsTrigger>
               <TabsTrigger value="commissions">Commissions</TabsTrigger>
+              <TabsTrigger value="premium-receivables">Premium Receivables</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="claims-payables" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Claims Payment Processing</CardTitle>
-                  <CardDescription>Process payments for approved claims with treaty capacity validation</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                        <p className="text-sm text-blue-600 font-medium">Total Outstanding Claims</p>
-                        <p className="text-2xl font-bold text-blue-900">{getApprovedClaims().length}</p>
-                      </div>
-                      <div className="bg-green-50 p-4 rounded-lg">
-                        <p className="text-sm text-green-600 font-medium">Total Amount Due</p>
-                        <p className="text-2xl font-bold text-green-900">
-                          USD {getApprovedClaims().reduce((sum, claim) => sum + claim.claimAmount, 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="bg-yellow-50 p-4 rounded-lg">
-                        <p className="text-sm text-yellow-600 font-medium">Expected Retro Recovery</p>
-                        <p className="text-2xl font-bold text-yellow-900">
-                          USD {getApprovedClaims().reduce((sum, claim) => sum + (claim.retroRecovery || 0), 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="bg-red-50 p-4 rounded-lg">
-                        <p className="text-sm text-red-600 font-medium">Net Exposure</p>
-                        <p className="text-2xl font-bold text-red-900">
-                          USD {getApprovedClaims().reduce((sum, claim) => sum + (claim.claimAmount - (claim.retroRecovery || 0)), 0).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Claim Reference</TableHead>
-                          <TableHead>Insured Name</TableHead>
-                          <TableHead>Claim Amount</TableHead>
-                          <TableHead>Retro Recovery</TableHead>
-                          <TableHead>Net Payable</TableHead>
-                          <TableHead>Payment Status</TableHead>
-                          <TableHead>Documents</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {getApprovedClaims().map((claim) => {
-                          const netPayable = claim.claimAmount - (claim.retroRecovery || 0);
-                          return (
-                            <TableRow key={claim.id}>
-                              <TableCell className="font-mono text-sm">{claim.claimNumber}</TableCell>
-                              <TableCell>{claim.insuredName}</TableCell>
-                              <TableCell>{claim.currency} {claim.claimAmount.toLocaleString()}</TableCell>
-                              <TableCell className="text-green-600">
-                                {claim.currency} {(claim.retroRecovery || 0).toLocaleString()}
-                              </TableCell>
-                              <TableCell className="font-medium">
-                                {claim.currency} {netPayable.toLocaleString()}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={claim.status === 'Outstanding' ? 'destructive' : 'default'}>
-                                  {claim.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex space-x-1">
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => downloadDocument("Claim Advice", claim.claimNumber)}
-                                  >
-                                    <Download className="h-3 w-3 mr-1" />
-                                    Advice
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => downloadDocument("Payment Voucher", claim.claimNumber)}
-                                  >
-                                    <Download className="h-3 w-3 mr-1" />
-                                    Voucher
-                                  </Button>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Button 
-                                  size="sm" 
-                                  onClick={() => handlePaymentProcessing(claim)}
-                                  disabled={claim.status === 'Full Payment'}
-                                >
-                                  <DollarSign className="h-3 w-3 mr-1" />
-                                  {claim.status === 'Full Payment' ? 'Paid' : 'Process Payment'}
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-
-                    {getApprovedClaims().length === 0 && (
-                      <div className="text-center py-8 text-gray-500">
-                        <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                        <p>No approved claims awaiting payment</p>
-                        <p className="text-sm">Claims will appear here once approved in the Claims module</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
 
             <TabsContent value="commissions" className="space-y-4">
               <Card>
@@ -1026,106 +669,317 @@ const AccountingModule = () => {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            <TabsContent value="premium-receivables" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Premium Receivables</CardTitle>
+                  <CardDescription>Manage premium and reinsurance receivables</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <p className="text-sm text-blue-600 font-medium">Total Receivables</p>
+                        <p className="text-2xl font-bold text-blue-900">USD 20.95M</p>
+                      </div>
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <p className="text-sm text-green-600 font-medium">Current (0-30 days)</p>
+                        <p className="text-2xl font-bold text-green-900">USD 15.2M</p>
+                      </div>
+                      <div className="bg-yellow-50 p-4 rounded-lg">
+                        <p className="text-sm text-yellow-600 font-medium">Overdue (31-90 days)</p>
+                        <p className="text-2xl font-bold text-yellow-900">USD 4.1M</p>
+                      </div>
+                      <div className="bg-red-50 p-4 rounded-lg">
+                        <p className="text-sm text-red-600 font-medium">Past Due (90+ days)</p>
+                        <p className="text-2xl font-bold text-red-900">USD 1.65M</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">Aging Analysis</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p>• Premium receivables aging shows healthy collection pattern</p>
+                          <p>• 72.5% of receivables are current (within 30 days)</p>
+                          <p>• Retrocession receivables total USD 12.2M</p>
+                        </div>
+                        <div>
+                          <p>• Average collection period: 35 days</p>
+                          <p>• Bad debt provision: 2.1% of total receivables</p>
+                          <p>• Foreign exchange exposure: USD 8.5M</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+
+        <TabsContent value="payables" className="space-y-4">
+          <Tabs defaultValue="claims-management" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="claims-management">Claims Management</TabsTrigger>
+              <TabsTrigger value="other-payables">Other Payables</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="claims-management" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Claims Payment Processing</CardTitle>
+                  <CardDescription>Process payments for approved claims with document management</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <p className="text-sm text-blue-600 font-medium">Total Outstanding Claims</p>
+                        <p className="text-2xl font-bold text-blue-900">{getApprovedClaims().length}</p>
+                      </div>
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <p className="text-sm text-green-600 font-medium">Total Amount Due</p>
+                        <p className="text-2xl font-bold text-green-900">
+                          USD {getApprovedClaims().reduce((sum, claim) => sum + claim.claimAmount, 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="bg-yellow-50 p-4 rounded-lg">
+                        <p className="text-sm text-yellow-600 font-medium">Expected Retro Recovery</p>
+                        <p className="text-2xl font-bold text-yellow-900">
+                          USD {getApprovedClaims().reduce((sum, claim) => sum + (claim.retroRecovery || 0), 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="bg-red-50 p-4 rounded-lg">
+                        <p className="text-sm text-red-600 font-medium">Net Exposure</p>
+                        <p className="text-2xl font-bold text-red-900">
+                          USD {getApprovedClaims().reduce((sum, claim) => sum + (claim.claimAmount - (claim.retroRecovery || 0)), 0).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Claim Reference</TableHead>
+                          <TableHead>Insured Name</TableHead>
+                          <TableHead>Claim Amount</TableHead>
+                          <TableHead>Retro Recovery</TableHead>
+                          <TableHead>Net Payable</TableHead>
+                          <TableHead>Payment Status</TableHead>
+                          <TableHead>Documents</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {getApprovedClaims().map((claim) => {
+                          const netPayable = claim.claimAmount - (claim.retroRecovery || 0);
+                          return (
+                            <TableRow key={claim.id}>
+                              <TableCell className="font-mono text-sm">{claim.claimNumber}</TableCell>
+                              <TableCell>{claim.insuredName}</TableCell>
+                              <TableCell>{claim.currency} {claim.claimAmount.toLocaleString()}</TableCell>
+                              <TableCell className="text-green-600">
+                                {claim.currency} {(claim.retroRecovery || 0).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {claim.currency} {netPayable.toLocaleString()}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={claim.status === 'Outstanding' ? 'destructive' : 'default'}>
+                                  {claim.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex space-x-1">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => downloadDocument("Claim Advice", claim.claimNumber)}
+                                  >
+                                    <Download className="h-3 w-3 mr-1" />
+                                    Advice
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => downloadDocument("Payment Voucher", claim.claimNumber)}
+                                  >
+                                    <Download className="h-3 w-3 mr-1" />
+                                    Voucher
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => downloadDocument("Debit Note", claim.claimNumber)}
+                                  >
+                                    <Download className="h-3 w-3 mr-1" />
+                                    Debit Note
+                                  </Button>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => handlePaymentProcessing(claim)}
+                                  disabled={claim.status === 'Full Payment'}
+                                >
+                                  <DollarSign className="h-3 w-3 mr-1" />
+                                  {claim.status === 'Full Payment' ? 'Paid' : 'Process Payment'}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+
+                    {getApprovedClaims().length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                        <p>No approved claims awaiting payment</p>
+                        <p className="text-sm">Claims will appear here once approved in the Claims module</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="other-payables" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Other Accounts Payable</CardTitle>
+                  <CardDescription>Manage commissions and other payables</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="bg-purple-50 p-4 rounded-lg">
+                        <p className="text-sm text-purple-600 font-medium">Total Payables</p>
+                        <p className="text-2xl font-bold text-purple-900">USD 18.3M</p>
+                      </div>
+                      <div className="bg-indigo-50 p-4 rounded-lg">
+                        <p className="text-sm text-indigo-600 font-medium">Commissions</p>
+                        <p className="text-2xl font-bold text-indigo-900">USD 3.2M</p>
+                      </div>
+                      <div className="bg-pink-50 p-4 rounded-lg">
+                        <p className="text-sm text-pink-600 font-medium">Other Payables</p>
+                        <p className="text-2xl font-bold text-pink-900">USD 2.3M</p>
+                      </div>
+                      <div className="bg-cyan-50 p-4 rounded-lg">
+                        <p className="text-sm text-cyan-600 font-medium">Overdue Items</p>
+                        <p className="text-2xl font-bold text-cyan-900">USD 0.8M</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">Payment Schedule</h4>
+                      <div className="space-y-2 text-sm">
+                        <p>• Next 7 days: USD 2.5M in scheduled payments</p>
+                        <p>• Next 30 days: USD 8.9M total payment obligations</p>
+                        <p>• Average payment terms: 45 days</p>
+                        <p>• Early payment discounts available: USD 150K potential savings</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         </TabsContent>
 
         <TabsContent value="investments" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Investment Management</CardTitle>
-              <CardDescription>Comprehensive investment tracking and portfolio management</CardDescription>
+              <CardTitle>Investment Portfolio Management</CardTitle>
+              <CardDescription>Manage investment allocations with entity identification and performance tracking</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
-                {/* Investment Overview */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <p className="text-sm text-blue-600 font-medium">Total Invested</p>
-                    <p className="text-2xl font-bold text-blue-900">
-                      USD {investmentMetrics.totalInvested.toLocaleString()}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex space-x-2">
+                    <Button onClick={handleNewInvestment}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      New Investment
+                    </Button>
+                    <Button variant="outline">
+                      <PieChart className="h-4 w-4 mr-2" />
+                      Portfolio Analysis
+                    </Button>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Input placeholder="Search investments..." className="w-64" />
+                    <Button variant="outline">
+                      <Filter className="h-4 w-4 mr-2" />
+                      Filter
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <p className="text-sm text-green-600 font-medium">Total Investments</p>
+                    <p className="text-2xl font-bold text-green-900">
+                      USD {investments.reduce((sum, inv) => sum + inv.amount, 0).toLocaleString()}
                     </p>
                   </div>
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <p className="text-sm text-green-600 font-medium">Expected Returns</p>
-                    <p className="text-2xl font-bold text-green-900">
-                      USD {investmentMetrics.totalExpectedReturns.toLocaleString()}
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <p className="text-sm text-blue-600 font-medium">Expected Returns</p>
+                    <p className="text-2xl font-bold text-blue-900">
+                      {(investments.reduce((sum, inv) => sum + (inv.amount * inv.expectedReturn / 100), 0) / investments.reduce((sum, inv) => sum + inv.amount, 0) * 100).toFixed(1)}%
                     </p>
                   </div>
                   <div className="bg-purple-50 p-4 rounded-lg">
-                    <p className="text-sm text-purple-600 font-medium">Actual Returns</p>
+                    <p className="text-sm text-purple-600 font-medium">Active Investments</p>
                     <p className="text-2xl font-bold text-purple-900">
-                      USD {investmentMetrics.totalActualReturns.toLocaleString()}
+                      {investments.filter(inv => inv.status === 'Active').length}
                     </p>
                   </div>
                   <div className="bg-orange-50 p-4 rounded-lg">
-                    <p className="text-sm text-orange-600 font-medium">Avg Return Rate</p>
+                    <p className="text-sm text-orange-600 font-medium">Investment Entities</p>
                     <p className="text-2xl font-bold text-orange-900">
-                      {investmentMetrics.averageReturnRate.toFixed(1)}%
-                    </p>
-                  </div>
-                  <div className="bg-cyan-50 p-4 rounded-lg">
-                    <p className="text-sm text-cyan-600 font-medium">Performance Ratio</p>
-                    <p className="text-2xl font-bold text-cyan-900">
-                      {investmentMetrics.performanceRatio.toFixed(2)}
+                      {new Set(investments.map(inv => inv.investmentEntity)).size}
                     </p>
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">Investment Portfolio</h3>
-                  <Button onClick={handleNewInvestment}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Investment
-                  </Button>
-                </div>
-
-                {/* Investments Table */}
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Investment Entity</TableHead>
+                      <TableHead>Entity Type</TableHead>
                       <TableHead>Investment Type</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Expected Return</TableHead>
-                      <TableHead>Actual Returns</TableHead>
-                      <TableHead>Performance</TableHead>
+                      <TableHead>Actual Return</TableHead>
                       <TableHead>Risk Level</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Maturity Date</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {investments.map((investment) => (
                       <TableRow key={investment.id}>
-                        <TableCell className="font-medium">{investment.investmentType}</TableCell>
-                        <TableCell>USD {investment.amountAllocated.toLocaleString()}</TableCell>
-                        <TableCell>
+                        <TableCell className="font-medium">
                           <div>
-                            <p className="font-medium">USD {investment.expectedReturnAmount.toLocaleString()}</p>
-                            <p className="text-xs text-gray-500">{investment.expectedReturnRate}%</p>
+                            <p className="font-semibold">{investment.investmentEntity}</p>
+                            <p className="text-xs text-gray-500">{investment.description}</p>
                           </div>
-                        </TableCell>
-                        <TableCell className="text-green-600">
-                          USD {investment.actualReturns.toLocaleString()}
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <div className={`w-2 h-2 rounded-full ${
-                              investment.performanceRatio >= 1 ? 'bg-green-500' : 
-                              investment.performanceRatio >= 0.8 ? 'bg-yellow-500' : 'bg-red-500'
-                            }`} />
-                            <span className={`text-sm font-medium ${
-                              investment.performanceRatio >= 1 ? 'text-green-600' : 
-                              investment.performanceRatio >= 0.8 ? 'text-yellow-600' : 'text-red-600'
-                            }`}>
-                              {(investment.performanceRatio * 100).toFixed(0)}%
-                            </span>
-                          </div>
+                          <Badge variant="outline">{investment.entityType}</Badge>
+                        </TableCell>
+                        <TableCell>{investment.investmentType}</TableCell>
+                        <TableCell>USD {investment.amount.toLocaleString()}</TableCell>
+                        <TableCell>{investment.expectedReturn}%</TableCell>
+                        <TableCell className={investment.actualReturn >= investment.expectedReturn ? 'text-green-600' : 'text-red-600'}>
+                          {investment.actualReturn}%
                         </TableCell>
                         <TableCell>
                           <Badge variant={
-                            investment.riskLevel === 'Low' ? 'secondary' : 
+                            investment.riskLevel === 'Low' ? 'secondary' :
                             investment.riskLevel === 'Medium' ? 'default' : 'destructive'
                           }>
                             {investment.riskLevel}
@@ -1136,22 +990,14 @@ const AccountingModule = () => {
                             {investment.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>{investment.maturityDate}</TableCell>
                         <TableCell>
                           <div className="flex space-x-1">
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleViewInvestment(investment)}
-                            >
+                            <Button size="sm" variant="outline" onClick={() => handleViewInvestment(investment)}>
                               <Eye className="h-3 w-3 mr-1" />
                               View
                             </Button>
-                            <Button 
-                              size="sm"
-                              onClick={() => handleEditInvestment(investment)}
-                            >
-                              <Edit className="h-3 w-3 mr-1" />
+                            <Button size="sm" onClick={() => handleUpdateInvestment(investment)}>
+                              <Calculator className="h-3 w-3 mr-1" />
                               Update
                             </Button>
                           </div>
@@ -1160,66 +1006,6 @@ const AccountingModule = () => {
                     ))}
                   </TableBody>
                 </Table>
-
-                {/* Portfolio Analysis */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Risk Distribution</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {['Low', 'Medium', 'High'].map(risk => {
-                          const count = investments.filter(inv => inv.riskLevel === risk).length;
-                          const percentage = investments.length > 0 ? (count / investments.length) * 100 : 0;
-                          return (
-                            <div key={risk} className="flex items-center justify-between">
-                              <span className="text-sm">{risk} Risk</span>
-                              <div className="flex items-center space-x-2">
-                                <div className="w-20 bg-gray-200 rounded-full h-2">
-                                  <div 
-                                    className={`h-2 rounded-full ${
-                                      risk === 'Low' ? 'bg-green-500' : 
-                                      risk === 'Medium' ? 'bg-yellow-500' : 'bg-red-500'
-                                    }`}
-                                    style={{ width: `${percentage}%` }}
-                                  />
-                                </div>
-                                <span className="text-sm font-medium">{percentage.toFixed(0)}%</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Investment Types</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {[...new Set(investments.map(inv => inv.investmentType))].map(type => {
-                          const typeInvestments = investments.filter(inv => inv.investmentType === type);
-                          const totalAmount = typeInvestments.reduce((sum, inv) => sum + inv.amountAllocated, 0);
-                          const percentage = investmentMetrics.totalInvested > 0 ? 
-                            (totalAmount / investmentMetrics.totalInvested) * 100 : 0;
-                          
-                          return (
-                            <div key={type} className="flex items-center justify-between">
-                              <span className="text-sm">{type}</span>
-                              <div className="flex items-center space-x-2">
-                                <span className="text-sm">USD {totalAmount.toLocaleString()}</span>
-                                <span className="text-xs text-gray-500">({percentage.toFixed(1)}%)</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -1229,34 +1015,289 @@ const AccountingModule = () => {
           <Card>
             <CardHeader>
               <CardTitle>Financial Reports</CardTitle>
-              <CardDescription>Generate comprehensive financial statements and reports</CardDescription>
+              <CardDescription>Generate comprehensive financial statements and reports with filtering options</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
+                {/* Report Filters */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-medium mb-3">Report Filters</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label>Start Date</Label>
+                      <Input 
+                        type="date" 
+                        value={reportFilters.startDate}
+                        onChange={(e) => setReportFilters({...reportFilters, startDate: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End Date</Label>
+                      <Input 
+                        type="date" 
+                        value={reportFilters.endDate}
+                        onChange={(e) => setReportFilters({...reportFilters, endDate: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Report Type</Label>
+                      <Select value={reportFilters.reportType} onValueChange={(value) => setReportFilters({...reportFilters, reportType: value})}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Reports</SelectItem>
+                          <SelectItem value="financial">Financial Only</SelectItem>
+                          <SelectItem value="regulatory">Regulatory Only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center">
-                    <FileText className="h-8 w-8 mb-2" />
+                  <Button 
+                    variant="outline" 
+                    className="h-24 flex flex-col items-center justify-center"
+                    onClick={() => generateReport('trial-balance')}
+                    disabled={isGeneratingReport}
+                  >
+                    <FileSpreadsheet className="h-8 w-8 mb-2" />
                     <span>Trial Balance</span>
                   </Button>
-                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center">
+                  <Button 
+                    variant="outline" 
+                    className="h-24 flex flex-col items-center justify-center"
+                    onClick={() => generateReport('profit-loss')}
+                    disabled={isGeneratingReport}
+                  >
                     <TrendingUp className="h-8 w-8 mb-2" />
                     <span>P&L Statement</span>
                   </Button>
-                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center">
-                    <DollarSign className="h-8 w-8 mb-2" />
+                  <Button 
+                    variant="outline" 
+                    className="h-24 flex flex-col items-center justify-center"
+                    onClick={() => generateReport('balance-sheet')}
+                    disabled={isGeneratingReport}
+                  >
+                    <BarChart3 className="h-8 w-8 mb-2" />
                     <span>Balance Sheet</span>
                   </Button>
-                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center">
-                    <FileText className="h-8 w-8 mb-2" />
+                  <Button 
+                    variant="outline" 
+                    className="h-24 flex flex-col items-center justify-center"
+                    onClick={() => generateReport('cash-flow')}
+                    disabled={isGeneratingReport}
+                  >
+                    <DollarSign className="h-8 w-8 mb-2" />
                     <span>Cash Flow</span>
                   </Button>
-                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center">
-                    <TrendingUp className="h-8 w-8 mb-2" />
-                    <span>Investment Report</span>
+                  <Button 
+                    variant="outline" 
+                    className="h-24 flex flex-col items-center justify-center"
+                    onClick={() => generateReport('technical-account')}
+                    disabled={isGeneratingReport}
+                  >
+                    <Calculator className="h-8 w-8 mb-2" />
+                    <span>Technical Account</span>
                   </Button>
-                  <Button variant="outline" className="h-24 flex flex-col items-center justify-center">
-                    <DollarSign className="h-8 w-8 mb-2" />
+                  <Button 
+                    variant="outline" 
+                    className="h-24 flex flex-col items-center justify-center"
+                    onClick={() => generateReport('regulatory-returns')}
+                    disabled={isGeneratingReport}
+                  >
+                    <FileText className="h-8 w-8 mb-2" />
                     <span>Regulatory Returns</span>
+                  </Button>
+                </div>
+
+                {isGeneratingReport && (
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                      <p className="text-blue-800">Generating report... Please wait.</p>
+                    </div>
+                  </div>
+                )}
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Trial Balance Preview</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account</TableHead>
+                          <TableHead className="text-right">Debit</TableHead>
+                          <TableHead className="text-right">Credit</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {trialBalance.map((account, index) => (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">{account.account}</TableCell>
+                            <TableCell className="text-right">{account.debit !== "0" ? parseInt(account.debit).toLocaleString() : "-"}</TableCell>
+                            <TableCell className="text-right">{account.credit !== "0" ? parseInt(account.credit).toLocaleString() : "-"}</TableCell>
+                            <TableCell className="text-right font-medium">{parseInt(account.balance.replace('-', '')).toLocaleString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="ifrs17">
+          <Card>
+            <CardHeader>
+              <CardTitle>IFRS 17 Compliance</CardTitle>
+              <CardDescription>Insurance contracts accounting and reporting with full system integration</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-emerald-50 p-4 rounded-lg">
+                    <p className="text-sm text-emerald-600 font-medium">CSM Balance</p>
+                    <p className="text-2xl font-bold text-emerald-900">USD 45.2M</p>
+                    <p className="text-xs text-emerald-600">Contractual Service Margin</p>
+                  </div>
+                  <div className="bg-cyan-50 p-4 rounded-lg">
+                    <p className="text-sm text-cyan-600 font-medium">Risk Adjustment</p>
+                    <p className="text-2xl font-bold text-cyan-900">USD 8.7M</p>
+                    <p className="text-xs text-cyan-600">Non-financial Risk</p>
+                  </div>
+                  <div className="bg-violet-50 p-4 rounded-lg">
+                    <p className="text-sm text-violet-600 font-medium">LIC</p>
+                    <p className="text-2xl font-bold text-violet-900">USD 152.6M</p>
+                    <p className="text-xs text-violet-600">Liability for Incurred Claims</p>
+                  </div>
+                  <div className="bg-amber-50 p-4 rounded-lg">
+                    <p className="text-sm text-amber-600 font-medium">LRC</p>
+                    <p className="text-2xl font-bold text-amber-900">USD 89.4M</p>
+                    <p className="text-xs text-amber-600">Liability for Remaining Coverage</p>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 p-6 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-4">IFRS 17 Summary</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="font-medium mb-2">Measurement Approach:</p>
+                      <p>• Premium Allocation Approach (PAA) for short-duration contracts</p>
+                      <p>• General Measurement Model (GMM) for complex contracts</p>
+                      <p>• Variable Fee Approach (VFA) for participating contracts</p>
+                    </div>
+                    <div>
+                      <p className="font-medium mb-2">Key Metrics:</p>
+                      <p>• Insurance Revenue: USD 89.3M (current period)</p>
+                      <p>• Insurance Service Expenses: USD 84.5M</p>
+                      <p>• Net Insurance Financial Result: USD 4.8M</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">PAA Contracts</CardTitle>
+                      <CardDescription>Premium Allocation Approach contracts</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span>Total PAA Contracts</span>
+                          <Badge variant="secondary">127</Badge>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span>Total Premium</span>
+                          <span className="font-medium">USD 56.45M</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span>Unearned Premium</span>
+                          <span className="font-medium">USD 23.18M</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span>Loss Component</span>
+                          <span className="font-medium">USD 0.00</span>
+                        </div>
+                        <Button 
+                          className="w-full mt-4" 
+                          onClick={() => generateReport('paa-analysis')}
+                          disabled={isGeneratingReport}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Generate PAA Report
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">GMM Contracts</CardTitle>
+                      <CardDescription>General Measurement Model contracts</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span>Total GMM Contracts</span>
+                          <Badge variant="secondary">45</Badge>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span>Total CSM</span>
+                          <span className="font-medium">USD 45.2M</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span>Risk Adjustment</span>
+                          <span className="font-medium">USD 12.8M</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span>Fulfillment CF</span>
+                          <span className="font-medium">USD 58.0M</span>
+                        </div>
+                        <Button 
+                          className="w-full mt-4" 
+                          onClick={() => generateReport('gmm-analysis')}
+                          disabled={isGeneratingReport}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Generate GMM Report
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="flex space-x-4">
+                  <Button 
+                    className="flex-1" 
+                    onClick={() => generateReport('ifrs17-full')}
+                    disabled={isGeneratingReport}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Generate Full IFRS 17 Report
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => generateReport('ifrs17-disclosure')}
+                    disabled={isGeneratingReport}
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Disclosure Notes
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => generateReport('ifrs17-reconciliation')}
+                    disabled={isGeneratingReport}
+                  >
+                    <Calculator className="h-4 w-4 mr-2" />
+                    Reconciliation
                   </Button>
                 </div>
               </div>
@@ -1265,7 +1306,7 @@ const AccountingModule = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Claims Payment Processing Dialog */}
+      {/* Payment Processing Dialog */}
       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -1318,29 +1359,6 @@ const AccountingModule = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="approverName">Approver Name *</Label>
-                    <Input
-                      id="approverName"
-                      value={approverName}
-                      onChange={(e) => setApproverName(e.target.value)}
-                      placeholder="Enter approver name"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="paymentReference">Payment Reference *</Label>
-                    <Input
-                      id="paymentReference"
-                      value={paymentReference}
-                      onChange={(e) => setPaymentReference(e.target.value)}
-                      placeholder="Enter payment reference"
-                      required
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="paymentStatus">Payment Status</Label>
                   <Select value={paymentStatus} onValueChange={setPaymentStatus}>
@@ -1381,368 +1399,266 @@ const AccountingModule = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Premium Payment Processing Dialog */}
-      <Dialog open={isPremiumPaymentDialogOpen} onOpenChange={setIsPremiumPaymentDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Process Premium Payment</DialogTitle>
-            <DialogDescription>
-              Process payment for {selectedPremiumBooking?.treatyName}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedPremiumBooking && (
-            <div className="space-y-6">
-              {/* Premium Summary */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium mb-2">Premium Summary</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p><strong>Treaty:</strong> {selectedPremiumBooking.treatyName}</p>
-                    <p><strong>Total Premium:</strong> {selectedPremiumBooking.currency} {selectedPremiumBooking.premiumAmount.toLocaleString()}</p>
-                    <p><strong>Paid Amount:</strong> {selectedPremiumBooking.currency} {selectedPremiumBooking.paidAmount.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p><strong>Outstanding:</strong> {selectedPremiumBooking.currency} {selectedPremiumBooking.outstandingAmount.toLocaleString()}</p>
-                    <p><strong>Current Status:</strong> {selectedPremiumBooking.status}</p>
-                    <p><strong>Last Payment:</strong> {selectedPremiumBooking.lastPaymentDate}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment Details */}
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="premiumPaymentAmount">Payment Amount</Label>
-                    <Input
-                      id="premiumPaymentAmount"
-                      type="number"
-                      value={premiumPaymentAmount}
-                      onChange={(e) => setPremiumPaymentAmount(e.target.value)}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="premiumPaymentDate">Payment Date</Label>
-                    <Input
-                      id="premiumPaymentDate"
-                      type="date"
-                      defaultValue={new Date().toISOString().split('T')[0]}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="premiumApproverName">Approver Name *</Label>
-                    <Input
-                      id="premiumApproverName"
-                      value={premiumApproverName}
-                      onChange={(e) => setPremiumApproverName(e.target.value)}
-                      placeholder="Enter approver name"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="premiumPaymentReference">Payment Reference *</Label>
-                    <Input
-                      id="premiumPaymentReference"
-                      value={premiumPaymentReference}
-                      onChange={(e) => setPremiumPaymentReference(e.target.value)}
-                      placeholder="Enter payment reference"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="premiumPaymentStatus">Payment Status</Label>
-                  <Select value={premiumPaymentStatus} onValueChange={setPremiumPaymentStatus}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Partial Payment">Partial Payment</SelectItem>
-                      <SelectItem value="Full Payment">Full Payment</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button variant="outline" onClick={() => setIsPremiumPaymentDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={processPremiumPayment}>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Process Payment
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Investment Management Dialog */}
+      {/* Investment Dialog */}
       <Dialog open={isInvestmentDialogOpen} onOpenChange={setIsInvestmentDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {isEditingInvestment ? (isNewInvestment ? 'New Investment' : 'Update Investment') : 'Investment Details'}
-            </DialogTitle>
+            <DialogTitle>Investment Management</DialogTitle>
             <DialogDescription>
-              {isEditingInvestment ? 'Enter investment information' : 'View investment details and performance'}
+              Create or update investment with entity identification
             </DialogDescription>
           </DialogHeader>
           
-          {selectedInvestment || isNewInvestment ? (
-            <div className="space-y-6">
-              {!isEditingInvestment ? (
-                // View Mode
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm">Investment Details</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <p><strong>Type:</strong> {selectedInvestment.investmentType}</p>
-                        <p><strong>Date:</strong> {selectedInvestment.investmentDate}</p>
-                        <p><strong>Amount:</strong> USD {selectedInvestment.amountAllocated.toLocaleString()}</p>
-                        <p><strong>Manager:</strong> {selectedInvestment.investmentManager}</p>
-                        <p><strong>Status:</strong> <Badge variant="secondary">{selectedInvestment.status}</Badge></p>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm">Financial Performance</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <p><strong>Expected Return:</strong> {selectedInvestment.expectedReturnRate}%</p>
-                        <p><strong>Expected Amount:</strong> USD {selectedInvestment.expectedReturnAmount.toLocaleString()}</p>
-                        <p><strong>Actual Returns:</strong> USD {selectedInvestment.actualReturns.toLocaleString()}</p>
-                        <p><strong>Performance:</strong> {(selectedInvestment.performanceRatio * 100).toFixed(0)}%</p>
-                        <p><strong>Risk Level:</strong> <Badge variant="outline">{selectedInvestment.riskLevel}</Badge></p>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm">Investment Timeline</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <p><strong>Investment Date:</strong> {selectedInvestment.investmentDate}</p>
-                        <p><strong>Maturity Date:</strong> {selectedInvestment.maturityDate}</p>
-                        <p><strong>Duration:</strong> {Math.ceil((new Date(selectedInvestment.maturityDate) - new Date(selectedInvestment.investmentDate)) / (1000 * 60 * 60 * 24 * 365))} years</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Description & Notes</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm mb-4">{selectedInvestment.description}</p>
-                      {selectedInvestment.notes && (
-                        <div>
-                          <p className="text-sm font-medium mb-2">Notes:</p>
-                          <p className="text-sm text-gray-600">{selectedInvestment.notes}</p>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="investmentEntity">Investment Entity *</Label>
+                <div className="relative">
+                  <Input
+                    id="investmentEntity"
+                    value={investmentFormData.investmentEntity}
+                    onChange={(e) => setInvestmentFormData({...investmentFormData, investmentEntity: e.target.value})}
+                    placeholder="e.g., Tanzania Government Bonds, Vodacom (VODA), CRDB Bank"
+                    className="pr-10"
+                  />
+                  <Search className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
+                </div>
+                <div className="text-xs text-gray-500">
+                  Enter company name, government body, stock ticker, or financial institution
+                </div>
+                {/* Entity Suggestions */}
+                {investmentFormData.investmentEntity && (
+                  <div className="border rounded-lg p-2 bg-gray-50 max-h-32 overflow-y-auto">
+                    <p className="text-xs font-medium text-gray-600 mb-1">Suggestions:</p>
+                    {entitySuggestions
+                      .filter(entity => 
+                        entity.name.toLowerCase().includes(investmentFormData.investmentEntity.toLowerCase())
+                      )
+                      .slice(0, 5)
+                      .map((entity, index) => (
+                        <div 
+                          key={index}
+                          className="text-xs p-1 hover:bg-white rounded cursor-pointer"
+                          onClick={() => setInvestmentFormData({
+                            ...investmentFormData, 
+                            investmentEntity: entity.name,
+                            entityType: entity.type
+                          })}
+                        >
+                          <span className="font-medium">{entity.name}</span>
+                          <Badge variant="outline" className="ml-2 text-xs">{entity.type}</Badge>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <div className="flex justify-end space-x-2">
-                    <Button variant="outline" onClick={() => setIsInvestmentDialogOpen(false)}>
-                      Close
-                    </Button>
-                    <Button onClick={() => setIsEditingInvestment(true)}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Investment
-                    </Button>
+                      ))
+                    }
                   </div>
-                </div>
-              ) : (
-                // Edit Mode
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="investmentType">Investment Type *</Label>
-                      <Select 
-                        value={investmentFormData.investmentType || ''} 
-                        onValueChange={(value) => setInvestmentFormData(prev => ({ ...prev, investmentType: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select investment type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Government Bonds">Government Bonds</SelectItem>
-                          <SelectItem value="Corporate Bonds">Corporate Bonds</SelectItem>
-                          <SelectItem value="Treasury Bills">Treasury Bills</SelectItem>
-                          <SelectItem value="Fixed Deposits">Fixed Deposits</SelectItem>
-                          <SelectItem value="Stocks">Stocks</SelectItem>
-                          <SelectItem value="Real Estate">Real Estate</SelectItem>
-                          <SelectItem value="Mutual Funds">Mutual Funds</SelectItem>
-                          <SelectItem value="Others">Others</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="investmentDate">Investment Date *</Label>
-                      <Input
-                        id="investmentDate"
-                        type="date"
-                        value={investmentFormData.investmentDate || ''}
-                        onChange={(e) => setInvestmentFormData(prev => ({ ...prev, investmentDate: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="amountAllocated">Amount Allocated *</Label>
-                      <Input
-                        id="amountAllocated"
-                        type="number"
-                        value={investmentFormData.amountAllocated || ''}
-                        onChange={(e) => setInvestmentFormData(prev => ({ ...prev, amountAllocated: e.target.value }))}
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="expectedReturnRate">Expected Return Rate (%) *</Label>
-                      <Input
-                        id="expectedReturnRate"
-                        type="number"
-                        step="0.01"
-                        value={investmentFormData.expectedReturnRate || ''}
-                        onChange={(e) => setInvestmentFormData(prev => ({ ...prev, expectedReturnRate: e.target.value }))}
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="maturityDate">Maturity Date</Label>
-                      <Input
-                        id="maturityDate"
-                        type="date"
-                        value={investmentFormData.maturityDate || ''}
-                        onChange={(e) => setInvestmentFormData(prev => ({ ...prev, maturityDate: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="riskLevel">Risk Level</Label>
-                      <Select 
-                        value={investmentFormData.riskLevel || 'Low'} 
-                        onValueChange={(value) => setInvestmentFormData(prev => ({ ...prev, riskLevel: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Low">Low</SelectItem>
-                          <SelectItem value="Medium">Medium</SelectItem>
-                          <SelectItem value="High">High</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="status">Investment Status</Label>
-                      <Select 
-                        value={investmentFormData.status || 'Active'} 
-                        onValueChange={(value) => setInvestmentFormData(prev => ({ ...prev, status: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Active">Active</SelectItem>
-                          <SelectItem value="Matured">Matured</SelectItem>
-                          <SelectItem value="Terminated">Terminated</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="actualReturns">Actual Returns (USD)</Label>
-                      <Input
-                        id="actualReturns"
-                        type="number"
-                        value={investmentFormData.actualReturns || ''}
-                        onChange={(e) => setInvestmentFormData(prev => ({ ...prev, actualReturns: e.target.value }))}
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="investmentManager">Investment Manager/Advisor</Label>
-                    <Input
-                      id="investmentManager"
-                      value={investmentFormData.investmentManager || ''}
-                      onChange={(e) => setInvestmentFormData(prev => ({ ...prev, investmentManager: e.target.value }))}
-                      placeholder="Enter investment manager name"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Investment Description</Label>
-                    <Textarea
-                      id="description"
-                      value={investmentFormData.description || ''}
-                      onChange={(e) => setInvestmentFormData(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Enter investment description..."
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="notes">Notes/Comments</Label>
-                    <Textarea
-                      id="notes"
-                      value={investmentFormData.notes || ''}
-                      onChange={(e) => setInvestmentFormData(prev => ({ ...prev, notes: e.target.value }))}
-                      placeholder="Enter any additional notes..."
-                      rows={3}
-                    />
-                  </div>
-
-                  {/* Expected Return Calculation */}
-                  {investmentFormData.amountAllocated && investmentFormData.expectedReturnRate && (
-                    <div className="bg-blue-50 p-3 rounded-lg">
-                      <p className="text-sm text-blue-800">
-                        Expected Return Amount: USD {((parseFloat(investmentFormData.amountAllocated) * parseFloat(investmentFormData.expectedReturnRate)) / 100).toLocaleString()}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end space-x-2 pt-4">
-                    <Button variant="outline" onClick={() => {
-                      setIsEditingInvestment(false);
-                      if (isNewInvestment) {
-                        setIsInvestmentDialogOpen(false);
-                        setIsNewInvestment(false);
-                      }
-                    }}>
-                      <X className="h-4 w-4 mr-2" />
-                      Cancel
-                    </Button>
-                    <Button onClick={saveInvestment}>
-                      <Save className="h-4 w-4 mr-2" />
-                      {isNewInvestment ? 'Create Investment' : 'Save Changes'}
-                    </Button>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="entityType">Entity Type *</Label>
+                <Select value={investmentFormData.entityType} onValueChange={(value) => setInvestmentFormData({...investmentFormData, entityType: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select entity type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Government">Government</SelectItem>
+                    <SelectItem value="Corporation">Corporation</SelectItem>
+                    <SelectItem value="Financial Institution">Financial Institution</SelectItem>
+                    <SelectItem value="Mutual Fund">Mutual Fund</SelectItem>
+                    <SelectItem value="Real Estate">Real Estate</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          ) : null}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="investmentType">Investment Type *</Label>
+                <Select value={investmentFormData.investmentType} onValueChange={(value) => setInvestmentFormData({...investmentFormData, investmentType: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select investment type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Bonds">Bonds</SelectItem>
+                    <SelectItem value="Stocks">Stocks</SelectItem>
+                    <SelectItem value="Real Estate">Real Estate</SelectItem>
+                    <SelectItem value="Fixed Deposits">Fixed Deposits</SelectItem>
+                    <SelectItem value="Treasury Bills">Treasury Bills</SelectItem>
+                    <SelectItem value="Mutual Funds">Mutual Funds</SelectItem>
+                    <SelectItem value="Others">Others</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="amount">Investment Amount *</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  value={investmentFormData.amount}
+                  onChange={(e) => setInvestmentFormData({...investmentFormData, amount: e.target.value})}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="expectedReturn">Expected Return Rate (%)</Label>
+                <Input
+                  id="expectedReturn"
+                  type="number"
+                  step="0.01"
+                  value={investmentFormData.expectedReturn}
+                  onChange={(e) => setInvestmentFormData({...investmentFormData, expectedReturn: e.target.value})}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="duration">Investment Duration</Label>
+                <Input
+                  id="duration"
+                  value={investmentFormData.duration}
+                  onChange={(e) => setInvestmentFormData({...investmentFormData, duration: e.target.value})}
+                  placeholder="e.g., 2 years, Long-term"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="riskLevel">Risk Level</Label>
+                <Select value={investmentFormData.riskLevel} onValueChange={(value) => setInvestmentFormData({...investmentFormData, riskLevel: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select risk level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Low">Low</SelectItem>
+                    <SelectItem value="Medium">Medium</SelectItem>
+                    <SelectItem value="High">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="investmentDate">Investment Date</Label>
+                <Input
+                  id="investmentDate"
+                  type="date"
+                  value={investmentFormData.investmentDate}
+                  onChange={(e) => setInvestmentFormData({...investmentFormData, investmentDate: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maturityDate">Maturity Date (if applicable)</Label>
+                <Input
+                  id="maturityDate"
+                  type="date"
+                  value={investmentFormData.maturityDate}
+                  onChange={(e) => setInvestmentFormData({...investmentFormData, maturityDate: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Investment Description</Label>
+              <Textarea
+                id="description"
+                value={investmentFormData.description}
+                onChange={(e) => setInvestmentFormData({...investmentFormData, description: e.target.value})}
+                placeholder="Describe the investment purpose and strategy..."
+                rows={3}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button variant="outline" onClick={() => setIsInvestmentDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveInvestment}>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Save Investment
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Investment Dialog */}
+      <Dialog open={isViewInvestmentDialogOpen} onOpenChange={setIsViewInvestmentDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Investment Details</DialogTitle>
+            <DialogDescription>
+              Comprehensive view of investment information
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedInvestment && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Investment Entity</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p><strong>Entity Name:</strong> {selectedInvestment.investmentEntity}</p>
+                    <p><strong>Entity Type:</strong> {selectedInvestment.entityType}</p>
+                    <p><strong>Investment Type:</strong> {selectedInvestment.investmentType}</p>
+                    <p><strong>Description:</strong> {selectedInvestment.description}</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Financial Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p><strong>Investment Amount:</strong> USD {selectedInvestment.amount.toLocaleString()}</p>
+                    <p><strong>Expected Return:</strong> {selectedInvestment.expectedReturn}%</p>
+                    <p><strong>Actual Return:</strong> {selectedInvestment.actualReturn}%</p>
+                    <p><strong>Risk Level:</strong> {selectedInvestment.riskLevel}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">Timeline & Status</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <p><strong>Investment Date:</strong> {selectedInvestment.investmentDate}</p>
+                    </div>
+                    <div>
+                      <p><strong>Maturity Date:</strong> {selectedInvestment.maturityDate || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p><strong>Duration:</strong> {selectedInvestment.duration}</p>
+                    </div>
+                  </div>
+                  <div className="pt-2">
+                    <p><strong>Status:</strong> <Badge variant="secondary">{selectedInvestment.status}</Badge></p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="bg-green-50 p-4 rounded-lg">
+                <h4 className="font-medium text-green-900 mb-2">Performance Summary</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p>Expected Annual Return: USD {(selectedInvestment.amount * selectedInvestment.expectedReturn / 100).toLocaleString()}</p>
+                    <p>Actual Annual Return: USD {(selectedInvestment.amount * selectedInvestment.actualReturn / 100).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p>Performance vs Expected: {((selectedInvestment.actualReturn - selectedInvestment.expectedReturn) / selectedInvestment.expectedReturn * 100).toFixed(1)}%</p>
+                    <p className={selectedInvestment.actualReturn >= selectedInvestment.expectedReturn ? 'text-green-600' : 'text-red-600'}>
+                      {selectedInvestment.actualReturn >= selectedInvestment.expectedReturn ? '✓ Outperforming' : '⚠ Underperforming'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
