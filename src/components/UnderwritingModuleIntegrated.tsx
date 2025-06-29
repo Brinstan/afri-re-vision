@@ -24,11 +24,21 @@ const UnderwritingModuleIntegrated = () => {
   const [currency, setCurrency] = useState("USD");
   const [inceptionDate, setInceptionDate] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
-
+  
   // XOL Layers state
   const [xolLayers, setXolLayers] = useState([
-    { id: 1, name: "Working Layer", limit: "", retention: "", participationPercentage: "", rate: "" }
+    { id: 1, name: "Layer 1", limit: "", retention: "", rate: "", participation: "100.00" }
   ]);
+
+  // Signed Share states for different contract types
+  const [stopLossSignedShare, setStopLossSignedShare] = useState("100.00");
+  const [surplusSignedShare, setSurplusSignedShare] = useState("100.00");
+  const [facultativeSignedShare, setFacultativeSignedShare] = useState("100.00");
+
+  // Validation error states
+  const [stopLossError, setStopLossError] = useState("");
+  const [surplusError, setSurplusError] = useState("");
+  const [facultativeError, setFacultativeError] = useState("");
 
   const { addUnderwritingContract, convertUnderwritingToTreaty, underwritingContracts } = useDataStore();
 
@@ -43,15 +53,51 @@ const UnderwritingModuleIntegrated = () => {
     { id: "agriculture", name: "Agriculture Insurance", code: "AGR" }
   ];
 
-  // XOL Layer Management
+  // Percentage validation function
+  const validatePercentage = (value, setError) => {
+    const numValue = parseFloat(value);
+    
+    if (isNaN(numValue)) {
+      setError("Please enter a valid number");
+      return false;
+    }
+    
+    if (numValue < 0) {
+      setError("Percentage cannot be negative");
+      return false;
+    }
+    
+    if (numValue > 100) {
+      setError("Percentage cannot exceed 100%");
+      return false;
+    }
+    
+    // Check decimal places
+    const decimalPlaces = (value.split('.')[1] || '').length;
+    if (decimalPlaces > 2) {
+      setError("Maximum 2 decimal places allowed");
+      return false;
+    }
+    
+    setError("");
+    return true;
+  };
+
+  // Handle percentage input changes
+  const handlePercentageChange = (value, setter, errorSetter) => {
+    setter(value);
+    validatePercentage(value, errorSetter);
+  };
+
+  // XOL Layer management functions
   const addXolLayer = () => {
     const newLayer = {
       id: Date.now(),
       name: `Layer ${xolLayers.length + 1}`,
       limit: "",
       retention: "",
-      participationPercentage: "",
-      rate: ""
+      rate: "",
+      participation: "100.00"
     };
     setXolLayers([...xolLayers, newLayer]);
   };
@@ -59,8 +105,6 @@ const UnderwritingModuleIntegrated = () => {
   const deleteXolLayer = (layerId) => {
     if (xolLayers.length > 1) {
       setXolLayers(xolLayers.filter(layer => layer.id !== layerId));
-    } else {
-      toast.error("At least one layer is required");
     }
   };
 
@@ -70,14 +114,16 @@ const UnderwritingModuleIntegrated = () => {
     ));
   };
 
-  // Validation for participation percentage
-  const validateParticipationPercentage = (value) => {
-    const percentage = parseFloat(value);
-    if (percentage > 100) {
-      toast.error("Participation percentage cannot exceed 100%");
-      return false;
-    }
-    return true;
+  const getTotalParticipation = () => {
+    return xolLayers.reduce((total, layer) => {
+      const participation = parseFloat(layer.participation) || 0;
+      return total + participation;
+    }, 0);
+  };
+
+  const isParticipationValid = () => {
+    const total = getTotalParticipation();
+    return total <= 100;
   };
 
   const addBroker = () => {
@@ -104,6 +150,26 @@ const UnderwritingModuleIntegrated = () => {
     }
   };
 
+  const validateSignedShares = () => {
+    let isValid = true;
+    
+    if (contractType === "stoploss") {
+      if (!validatePercentage(stopLossSignedShare, setStopLossError)) {
+        isValid = false;
+      }
+    } else if (contractType === "surplus") {
+      if (!validatePercentage(surplusSignedShare, setSurplusError)) {
+        isValid = false;
+      }
+    } else if (contractType === "facultative") {
+      if (!validatePercentage(facultativeSignedShare, setFacultativeError)) {
+        isValid = false;
+      }
+    }
+    
+    return isValid;
+  };
+
   const handleSaveContract = () => {
     // Validation
     if (!contractNumber || !treatyName || !premium || !inceptionDate || !expiryDate) {
@@ -116,15 +182,16 @@ const UnderwritingModuleIntegrated = () => {
       return;
     }
 
+    // Validate signed shares for applicable contract types
+    if (!validateSignedShares()) {
+      toast.error("Please correct the signed share percentage errors");
+      return;
+    }
+
     // XOL specific validation
-    if (contractType === "xol") {
-      const totalParticipation = xolLayers.reduce((sum, layer) => 
-        sum + (parseFloat(layer.participationPercentage) || 0), 0
-      );
-      if (totalParticipation > 100) {
-        toast.error("Total participation percentage across all layers cannot exceed 100%");
-        return;
-      }
+    if (contractType === "xol" && !isParticipationValid()) {
+      toast.error("Total participation percentage cannot exceed 100%");
+      return;
     }
 
     const newContract = {
@@ -141,7 +208,11 @@ const UnderwritingModuleIntegrated = () => {
       status: 'Draft' as const,
       inceptionDate,
       expiryDate,
-      xolLayers: contractType === "xol" ? xolLayers : undefined
+      // Add signed share data
+      signedShare: contractType === "stoploss" ? parseFloat(stopLossSignedShare) :
+                   contractType === "surplus" ? parseFloat(surplusSignedShare) :
+                   contractType === "facultative" ? parseFloat(facultativeSignedShare) : null,
+      xolLayers: contractType === "xol" ? xolLayers : null
     };
 
     addUnderwritingContract(newContract);
@@ -154,7 +225,10 @@ const UnderwritingModuleIntegrated = () => {
     setSelectedLines([]);
     setBrokers([{ id: 1, name: "", reference: "", commission: "" }]);
     setCedants([{ id: 1, name: "", reference: "", country: "" }]);
-    setXolLayers([{ id: 1, name: "Working Layer", limit: "", retention: "", participationPercentage: "", rate: "" }]);
+    setStopLossSignedShare("100.00");
+    setSurplusSignedShare("100.00");
+    setFacultativeSignedShare("100.00");
+    setXolLayers([{ id: 1, name: "Layer 1", limit: "", retention: "", rate: "", participation: "100.00" }]);
   };
 
   const handleConvertToTreaty = (contractId: string) => {
@@ -168,29 +242,42 @@ const UnderwritingModuleIntegrated = () => {
     return `${year}${String(random).padStart(5, '0')}`;
   };
 
-  const getTabsList = () => {
-    const baseTabs = ["contract", "parties"];
-    
-    switch (contractType) {
-      case "xol":
-        return [...baseTabs, "xol-coverage", "financial", "clauses", "contracts"];
-      case "stoploss":
-        return [...baseTabs, "stoploss-coverage", "stoploss-financial", "clauses", "contracts"];
-      case "surplus":
-        return [...baseTabs, "surplus-coverage", "surplus-financial", "clauses", "contracts"];
-      case "facultative":
-        return [...baseTabs, "facultative-coverage", "facultative-financial", "clauses", "contracts"];
-      default:
-        return [...baseTabs, "coverage", "financial", "clauses", "contracts"];
-    }
-  };
+  // Percentage input component with validation
+  const PercentageInput = ({ value, onChange, error, label, id }) => (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="flex items-center">
+        {label}
+        <span className="text-red-500 ml-1">*</span>
+      </Label>
+      <div className="relative">
+        <Input
+          id={id}
+          type="number"
+          step="0.01"
+          min="0"
+          max="100"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="100.00"
+          className={`pr-8 ${error ? 'border-red-500' : ''}`}
+        />
+        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
+      </div>
+      {error && (
+        <div className="flex items-center text-red-500 text-sm">
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          {error}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Dynamic Underwriting Module</h2>
-          <p className="text-gray-600">Advanced contract management with multi-layer support and dynamic interfaces</p>
+          <h2 className="text-2xl font-bold text-gray-900">Integrated Underwriting Module</h2>
+          <p className="text-gray-600">Comprehensive treaty and policy underwriting with automatic treaty conversion</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline">
@@ -206,23 +293,12 @@ const UnderwritingModuleIntegrated = () => {
 
       <Tabs defaultValue="contract" className="space-y-4">
         <TabsList className="grid w-full grid-cols-6">
-          {getTabsList().map((tab) => (
-            <TabsTrigger key={tab} value={tab}>
-              {tab === "contract" && "Contract Details"}
-              {tab === "parties" && "Parties & Brokers"}
-              {tab === "xol-coverage" && "XOL Coverage"}
-              {tab === "stoploss-coverage" && "Stop Loss Terms"}
-              {tab === "surplus-coverage" && "Surplus Terms"}
-              {tab === "facultative-coverage" && "Facultative Terms"}
-              {tab === "coverage" && "Coverage Terms"}
-              {tab === "stoploss-financial" && "Stop Loss Financial"}
-              {tab === "surplus-financial" && "Surplus Financial"}
-              {tab === "facultative-financial" && "Facultative Financial"}
-              {tab === "financial" && "Financial Terms"}
-              {tab === "clauses" && "Clauses"}
-              {tab === "contracts" && "Saved Contracts"}
-            </TabsTrigger>
-          ))}
+          <TabsTrigger value="contract">Contract Details</TabsTrigger>
+          <TabsTrigger value="parties">Parties & Brokers</TabsTrigger>
+          <TabsTrigger value="coverage">Coverage Terms</TabsTrigger>
+          <TabsTrigger value="financial">Financial Terms</TabsTrigger>
+          <TabsTrigger value="clauses">Clauses & Conditions</TabsTrigger>
+          <TabsTrigger value="contracts">Saved Contracts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="contract" className="space-y-4">
@@ -383,7 +459,7 @@ const UnderwritingModuleIntegrated = () => {
             <CardHeader>
               <CardTitle className="text-lg">Lines of Business Coverage</CardTitle>
               <CardDescription>
-                Select applicable lines of business for this contract
+                {contractType === 'xol' ? 'Select multiple lines for combined XOL coverage' : 'Select applicable lines of business'}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -538,553 +614,513 @@ const UnderwritingModuleIntegrated = () => {
           </div>
         </TabsContent>
 
-        {/* XOL Coverage Terms */}
-        <TabsContent value="xol-coverage" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Excess of Loss Layer Structure</CardTitle>
-                <CardDescription>Configure multiple coverage layers with participation percentages</CardDescription>
-              </div>
-              <Button onClick={addXolLayer}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Layer
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {xolLayers.map((layer, index) => (
-                <div key={layer.id} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">{layer.name}</h4>
-                    <div className="flex space-x-2">
-                      <Badge variant="outline">Layer {index + 1}</Badge>
-                      {xolLayers.length > 1 && (
-                        <Button 
-                          size="sm" 
-                          variant="destructive" 
-                          onClick={() => deleteXolLayer(layer.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="space-y-2">
-                      <Label>Layer Name</Label>
-                      <Input
-                        value={layer.name}
-                        onChange={(e) => updateXolLayer(layer.id, 'name', e.target.value)}
-                        placeholder="e.g., Working Layer"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Limit (USD)</Label>
-                      <Input
-                        type="number"
-                        value={layer.limit}
-                        onChange={(e) => updateXolLayer(layer.id, 'limit', e.target.value)}
-                        placeholder="5000000"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Retention (USD)</Label>
-                      <Input
-                        type="number"
-                        value={layer.retention}
-                        onChange={(e) => updateXolLayer(layer.id, 'retention', e.target.value)}
-                        placeholder="500000"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Rate on Line %</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={layer.rate}
-                        onChange={(e) => updateXolLayer(layer.id, 'rate', e.target.value)}
-                        placeholder="8.50"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Participation Percentage (0-100%)</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={layer.participationPercentage}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (validateParticipationPercentage(value)) {
-                            updateXolLayer(layer.id, 'participationPercentage', value);
-                          }
-                        }}
-                        placeholder="50.00"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Coverage Description</Label>
-                      <Input
-                        placeholder="e.g., USD 5M xs USD 500K"
-                        value={layer.limit && layer.retention ? 
-                          `USD ${parseInt(layer.limit).toLocaleString()} xs USD ${parseInt(layer.retention).toLocaleString()}` : 
-                          ""
-                        }
-                        disabled
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {/* Participation Summary */}
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="font-medium text-blue-900 mb-2">Participation Summary</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <p className="text-blue-600">Total Layers:</p>
-                    <p className="font-bold text-blue-900">{xolLayers.length}</p>
-                  </div>
-                  <div>
-                    <p className="text-blue-600">Total Participation:</p>
-                    <p className={`font-bold ${
-                      xolLayers.reduce((sum, layer) => sum + (parseFloat(layer.participationPercentage) || 0), 0) > 100 
-                        ? 'text-red-600' : 'text-blue-900'
-                    }`}>
-                      {xolLayers.reduce((sum, layer) => sum + (parseFloat(layer.participationPercentage) || 0), 0).toFixed(2)}%
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-blue-600">Validation Status:</p>
-                    <p className={`font-bold ${
-                      xolLayers.reduce((sum, layer) => sum + (parseFloat(layer.participationPercentage) || 0), 0) <= 100 
-                        ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {xolLayers.reduce((sum, layer) => sum + (parseFloat(layer.participationPercentage) || 0), 0) <= 100 
-                        ? 'Valid' : 'Exceeds 100%'}
-                    </p>
-                  </div>
-                </div>
-                {xolLayers.reduce((sum, layer) => sum + (parseFloat(layer.participationPercentage) || 0), 0) > 100 && (
-                  <div className="mt-2 p-2 bg-red-100 rounded flex items-center">
-                    <AlertTriangle className="h-4 w-4 text-red-600 mr-2" />
-                    <span className="text-red-800 text-sm">Total participation percentage exceeds 100%. Please adjust layer percentages.</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Stop Loss Coverage Terms */}
-        <TabsContent value="stoploss-coverage" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Stop Loss Coverage Terms</CardTitle>
-              <CardDescription>Configure stop loss protection parameters</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Coverage Limit (%)</Label>
-                  <Input type="number" step="0.01" placeholder="90.00" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Attachment Point (%)</Label>
-                  <Input type="number" step="0.01" placeholder="80.00" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Coverage Period</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="annual">Annual</SelectItem>
-                      <SelectItem value="occurrence">Per Occurrence</SelectItem>
-                      <SelectItem value="aggregate">Aggregate</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Applicable Risks</Label>
-                  <Textarea placeholder="Specify applicable risks and exclusions..." rows={3} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Special Conditions</Label>
-                  <Textarea placeholder="Enter special conditions..." rows={3} />
-                </div>
-              </div>
-
-              <div className="bg-yellow-50 p-4 rounded-lg">
-                <h4 className="font-medium text-yellow-900">Stop Loss Structure</h4>
-                <p className="text-sm text-yellow-800">90% of 80% - Covers losses exceeding 80% of premium up to 90% of premium</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Surplus Coverage Terms */}
-        <TabsContent value="surplus-coverage" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Surplus Lines Coverage Terms</CardTitle>
-              <CardDescription>Configure surplus lines parameters</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label>Number of Lines</Label>
-                  <Input type="number" placeholder="9" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Retention Amount</Label>
-                  <Input type="number" placeholder="1000000" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Maximum Line</Label>
-                  <Input type="number" placeholder="10000000" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Coverage Period</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="annual">Annual</SelectItem>
-                      <SelectItem value="occurrence">Per Occurrence</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Applicable Risks</Label>
-                  <Textarea placeholder="Define applicable risks and coverage scope..." rows={3} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Special Conditions</Label>
-                  <Textarea placeholder="Enter special conditions and exclusions..." rows={3} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Facultative Coverage Terms */}
-        <TabsContent value="facultative-coverage" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Facultative Coverage Terms</CardTitle>
-              <CardDescription>Configure facultative reinsurance parameters</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Coverage Limits</Label>
-                  <Input type="number" placeholder="5000000" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Retention Level</Label>
-                  <Input type="number" placeholder="500000" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Coverage Period</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="annual">Annual</SelectItem>
-                      <SelectItem value="occurrence">Per Occurrence</SelectItem>
-                      <SelectItem value="risk">Per Risk</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Applicable Risks</Label>
-                  <Textarea placeholder="Specify risks covered under this facultative arrangement..." rows={4} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Special Conditions</Label>
-                  <Textarea placeholder="Enter special conditions, exclusions, and terms..." rows={4} />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Risk Assessment Notes</Label>
-                <Textarea placeholder="Detailed risk assessment and underwriting notes..." rows={3} />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Stop Loss Financial Terms */}
-        <TabsContent value="stoploss-financial" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Stop Loss Financial Terms</CardTitle>
-              <CardDescription>Configure financial parameters for stop loss coverage</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Premium Rate (%)</Label>
-                  <Input type="number" step="0.01" placeholder="5.00" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Minimum Premium</Label>
-                  <Input type="number" placeholder="100000" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Maximum Premium</Label>
-                  <Input type="number" placeholder="500000" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Commission Structure (%)</Label>
-                  <Input type="number" step="0.01" placeholder="15.00" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Payment Terms</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select terms" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="quarterly">Quarterly</SelectItem>
-                      <SelectItem value="annual">Annual</SelectItem>
-                      <SelectItem value="as-due">As & When Due</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Loss Participation Details</Label>
-                <Textarea placeholder="Describe loss participation arrangements and profit sharing..." rows={3} />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Surplus Financial Terms */}
-        <TabsContent value="surplus-financial" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Surplus Financial Terms</CardTitle>
-              <CardDescription>Configure financial parameters for surplus lines</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Commission Rate (%)</Label>
-                  <Input type="number" step="0.01" placeholder="25.00" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Profit Commission (%)</Label>
-                  <Input type="number" step="0.01" placeholder="20.00" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Sliding Scale Commission</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select option" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="yes">Yes</SelectItem>
-                      <SelectItem value="no">No</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Premium Calculations</Label>
-                  <Textarea placeholder="Describe premium calculation methodology..." rows={3} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Currency Specifications</Label>
-                  <Textarea placeholder="Specify currency arrangements and exchange rate provisions..." rows={3} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Facultative Financial Terms */}
-        <TabsContent value="facultative-financial" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Facultative Financial Terms</CardTitle>
-              <CardDescription>Configure financial parameters for facultative reinsurance</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label>Premium Rate (%)</Label>
-                  <Input type="number" step="0.01" placeholder="8.50" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Commission Rate (%)</Label>
-                  <Input type="number" step="0.01" placeholder="20.00" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Brokerage (%)</Label>
-                  <Input type="number" step="0.01" placeholder="5.00" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Taxes (%)</Label>
-                  <Input type="number" step="0.01" placeholder="2.00" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Payment Terms</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select terms" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="30-days">30 Days</SelectItem>
-                      <SelectItem value="60-days">60 Days</SelectItem>
-                      <SelectItem value="90-days">90 Days</SelectItem>
-                      <SelectItem value="immediate">Immediate</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Currency</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select currency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                      <SelectItem value="GBP">GBP</SelectItem>
-                      <SelectItem value="local">Local Currency</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Loss Participation Details</Label>
-                <Textarea placeholder="Describe loss participation, profit sharing, and settlement terms..." rows={4} />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Standard Coverage Terms for other types */}
         <TabsContent value="coverage" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Coverage Terms</CardTitle>
-              <CardDescription>Configure coverage parameters</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {contractType === 'quota' && (
+          {contractType === 'quota' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Quota Share Terms</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label>Cession Percentage</Label>
-                    <Input type="number" step="0.01" placeholder="50.00" />
+                    <Label htmlFor="cessionPercentage">Cession Percentage</Label>
+                    <Input id="cessionPercentage" type="number" step="0.01" placeholder="50.00" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Commission Rate %</Label>
-                    <Input type="number" step="0.01" placeholder="25.00" />
+                    <Label htmlFor="commissionRate">Commission Rate %</Label>
+                    <Input id="commissionRate" type="number" step="0.01" placeholder="25.00" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Profit Commission %</Label>
-                    <Input type="number" step="0.01" placeholder="20.00" />
+                    <Label htmlFor="profitCommission">Profit Commission %</Label>
+                    <Input id="profitCommission" type="number" step="0.01" placeholder="20.00" />
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
+
+          {contractType === 'xol' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Excess of Loss Structure</CardTitle>
+                <CardDescription>Multi-layer XOL coverage with individual participation percentages</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-medium">Layer Configuration</h4>
+                  <Button size="sm" onClick={addXolLayer}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Layer
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  {xolLayers.map((layer, index) => (
+                    <div key={layer.id} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <h5 className="font-medium">{layer.name}</h5>
+                        {xolLayers.length > 1 && (
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => deleteXolLayer(layer.id)}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                        <div className="space-y-2">
+                          <Label>Layer Name</Label>
+                          <Input
+                            value={layer.name}
+                            onChange={(e) => updateXolLayer(layer.id, 'name', e.target.value)}
+                            placeholder="Layer name"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Limit</Label>
+                          <Input
+                            type="number"
+                            value={layer.limit}
+                            onChange={(e) => updateXolLayer(layer.id, 'limit', e.target.value)}
+                            placeholder="5000000"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Retention</Label>
+                          <Input
+                            type="number"
+                            value={layer.retention}
+                            onChange={(e) => updateXolLayer(layer.id, 'retention', e.target.value)}
+                            placeholder="500000"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Rate %</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={layer.rate}
+                            onChange={(e) => updateXolLayer(layer.id, 'rate', e.target.value)}
+                            placeholder="8.50"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Participation %</Label>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                              value={layer.participation}
+                              onChange={(e) => updateXolLayer(layer.id, 'participation', e.target.value)}
+                              placeholder="100.00"
+                              className="pr-8"
+                            />
+                            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className={`p-4 rounded-lg ${isParticipationValid() ? 'bg-green-50' : 'bg-red-50'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Total Participation:</span>
+                    <span className={`text-lg font-bold ${isParticipationValid() ? 'text-green-700' : 'text-red-700'}`}>
+                      {getTotalParticipation().toFixed(2)}%
+                    </span>
+                  </div>
+                  {!isParticipationValid() && (
+                    <div className="flex items-center mt-2 text-red-600 text-sm">
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      Total participation cannot exceed 100%
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {contractType === 'stoploss' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Stop Loss Terms</CardTitle>
+                <CardDescription>Stop loss coverage configuration</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="coverageLimit">Coverage Limit %</Label>
+                    <Input id="coverageLimit" type="number" step="0.01" placeholder="90.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="attachmentPoint">Attachment Point %</Label>
+                    <Input id="attachmentPoint" type="number" step="0.01" placeholder="80.00" />
+                  </div>
+                  <PercentageInput
+                    value={stopLossSignedShare}
+                    onChange={(value) => handlePercentageChange(value, setStopLossSignedShare, setStopLossError)}
+                    error={stopLossError}
+                    label="Signed Share"
+                    id="stopLossSignedShare"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="coveragePeriod">Coverage Period</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select period" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="annual">Annual</SelectItem>
+                        <SelectItem value="occurrence">Per Occurrence</SelectItem>
+                        <SelectItem value="aggregate">Aggregate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="applicableRisks">Applicable Risks</Label>
+                    <Textarea
+                      id="applicableRisks"
+                      placeholder="Describe applicable risks..."
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {contractType === 'surplus' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Surplus Lines Terms</CardTitle>
+                <CardDescription>Surplus lines coverage configuration</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="numberOfLines">Number of Lines</Label>
+                    <Input id="numberOfLines" type="number" placeholder="9" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="retentionAmount">Retention Amount</Label>
+                    <Input id="retentionAmount" type="number" placeholder="1000000" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="maxLine">Maximum Line</Label>
+                    <Input id="maxLine" type="number" placeholder="10000000" />
+                  </div>
+                  <PercentageInput
+                    value={surplusSignedShare}
+                    onChange={(value) => handlePercentageChange(value, setSurplusSignedShare, setSurplusError)}
+                    error={surplusError}
+                    label="Signed Share"
+                    id="surplusSignedShare"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="coveragePeriodSurplus">Coverage Period</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select period" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="annual">Annual</SelectItem>
+                        <SelectItem value="occurrence">Per Occurrence</SelectItem>
+                        <SelectItem value="aggregate">Aggregate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="applicableRisksSurplus">Applicable Risks</Label>
+                    <Textarea
+                      id="applicableRisksSurplus"
+                      placeholder="Describe applicable risks..."
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {contractType === 'facultative' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Facultative Terms</CardTitle>
+                <CardDescription>Facultative coverage configuration</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="coverageLimitFac">Coverage Limit</Label>
+                    <Input id="coverageLimitFac" type="number" placeholder="5000000" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="retentionLevelFac">Retention Level</Label>
+                    <Input id="retentionLevelFac" type="number" placeholder="500000" />
+                  </div>
+                  <PercentageInput
+                    value={facultativeSignedShare}
+                    onChange={(value) => handlePercentageChange(value, setFacultativeSignedShare, setFacultativeError)}
+                    error={facultativeError}
+                    label="Signed Share"
+                    id="facultativeSignedShare"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="coveragePeriodFac">Coverage Period</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select period" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="annual">Annual</SelectItem>
+                        <SelectItem value="occurrence">Per Occurrence</SelectItem>
+                        <SelectItem value="aggregate">Aggregate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="riskAssessment">Risk Assessment Notes</Label>
+                    <Textarea
+                      id="riskAssessment"
+                      placeholder="Enter risk assessment notes..."
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
-        {/* Standard Financial Terms */}
         <TabsContent value="financial" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {contractType === 'stoploss' && (
             <Card>
               <CardHeader>
-                <CardTitle>Premium Information</CardTitle>
+                <CardTitle>Stop Loss Financial Terms</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Estimated Annual Premium</Label>
-                  <Input type="number" placeholder="2500000" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="premiumRate">Premium Rate %</Label>
+                    <Input id="premiumRate" type="number" step="0.01" placeholder="5.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="minimumPremiumSL">Minimum Premium</Label>
+                    <Input id="minimumPremiumSL" type="number" placeholder="100000" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="maximumPremiumSL">Maximum Premium</Label>
+                    <Input id="maximumPremiumSL" type="number" placeholder="1000000" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Minimum Premium</Label>
-                  <Input type="number" placeholder="1000000" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Deposit Premium</Label>
-                  <Input type="number" placeholder="750000" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="commissionStructureSL">Commission Structure</Label>
+                    <Input id="commissionStructureSL" type="number" step="0.01" placeholder="15.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lossParticipationSL">Loss Participation %</Label>
+                    <Input id="lossParticipationSL" type="number" step="0.01" placeholder="10.00" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
+          )}
 
+          {contractType === 'surplus' && (
             <Card>
               <CardHeader>
-                <CardTitle>Payment Terms</CardTitle>
+                <CardTitle>Surplus Financial Terms</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Payment Terms</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select terms" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="quarterly">Quarterly</SelectItem>
-                      <SelectItem value="semi-annual">Semi-Annual</SelectItem>
-                      <SelectItem value="annual">Annual</SelectItem>
-                      <SelectItem value="as-due">As & When Due</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="commissionRateSurplus">Commission Rate %</Label>
+                    <Input id="commissionRateSurplus" type="number" step="0.01" placeholder="25.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="profitCommissionSurplus">Profit Commission %</Label>
+                    <Input id="profitCommissionSurplus" type="number" step="0.01" placeholder="20.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="slidingScale">Sliding Scale</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select option" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Settlement Terms</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select settlement" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="30-days">30 Days</SelectItem>
-                      <SelectItem value="60-days">60 Days</SelectItem>
-                      <SelectItem value="90-days">90 Days</SelectItem>
-                      <SelectItem value="immediate">Immediate</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Interest Rate % (Late Payment)</Label>
-                  <Input type="number" step="0.01" placeholder="1.50" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="premiumCalculationSurplus">Premium Calculation Method</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="proportional">Proportional</SelectItem>
+                        <SelectItem value="fixed">Fixed Rate</SelectItem>
+                        <SelectItem value="sliding">Sliding Scale</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentTermsSurplus">Payment Terms</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select terms" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="quarterly">Quarterly</SelectItem>
+                        <SelectItem value="semi-annual">Semi-Annual</SelectItem>
+                        <SelectItem value="annual">Annual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          </div>
+          )}
+
+          {contractType === 'facultative' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Facultative Financial Terms</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="premiumRateFac">Premium Rate %</Label>
+                    <Input id="premiumRateFac" type="number" step="0.01" placeholder="8.50" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="commissionFac">Commission %</Label>
+                    <Input id="commissionFac" type="number" step="0.01" placeholder="25.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="brokerageFac">Brokerage %</Label>
+                    <Input id="brokerageFac" type="number" step="0.01" placeholder="5.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="taxesFac">Taxes %</Label>
+                    <Input id="taxesFac" type="number" step="0.01" placeholder="2.00" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentTermsFac">Payment Terms</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select terms" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="30-days">30 Days</SelectItem>
+                        <SelectItem value="60-days">60 Days</SelectItem>
+                        <SelectItem value="90-days">90 Days</SelectItem>
+                        <SelectItem value="immediate">Immediate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="currencySpecFac">Currency Specifications</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                        <SelectItem value="local">Local Currency</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {(contractType === 'quota' || contractType === 'xol') && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Premium Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="estimatedPremium">Estimated Annual Premium</Label>
+                    <Input id="estimatedPremium" type="number" placeholder="2500000" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="minimumPremium">Minimum Premium</Label>
+                    <Input id="minimumPremium" type="number" placeholder="1000000" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="depositPremium">Deposit Premium</Label>
+                    <Input id="depositPremium" type="number" placeholder="750000" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment Terms</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentTerms">Payment Terms</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select terms" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="quarterly">Quarterly</SelectItem>
+                        <SelectItem value="semi-annual">Semi-Annual</SelectItem>
+                        <SelectItem value="annual">Annual</SelectItem>
+                        <SelectItem value="as-due">As & When Due</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="settlementTerms">Settlement Terms</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select settlement" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="30-days">30 Days</SelectItem>
+                        <SelectItem value="60-days">60 Days</SelectItem>
+                        <SelectItem value="90-days">90 Days</SelectItem>
+                        <SelectItem value="immediate">Immediate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="interestRate">Interest Rate % (Late Payment)</Label>
+                    <Input id="interestRate" type="number" step="0.01" placeholder="1.50" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="clauses" className="space-y-4">
@@ -1094,22 +1130,24 @@ const UnderwritingModuleIntegrated = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Special Conditions</Label>
+                <Label htmlFor="specialConditions">Special Conditions</Label>
                 <Textarea
+                  id="specialConditions"
                   placeholder="Enter any special conditions or clauses..."
                   rows={4}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Exclusions</Label>
+                <Label htmlFor="exclusions">Exclusions</Label>
                 <Textarea
+                  id="exclusions"
                   placeholder="Specify any exclusions..."
                   rows={3}
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Jurisdiction</Label>
+                  <Label htmlFor="jurisdiction">Jurisdiction</Label>
                   <Select>
                     <SelectTrigger>
                       <SelectValue placeholder="Select jurisdiction" />
@@ -1122,7 +1160,7 @@ const UnderwritingModuleIntegrated = () => {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Arbitration</Label>
+                  <Label htmlFor="arbitration">Arbitration</Label>
                   <Select>
                     <SelectTrigger>
                       <SelectValue placeholder="Select arbitration" />
@@ -1156,11 +1194,6 @@ const UnderwritingModuleIntegrated = () => {
                           <Badge variant={contract.status === 'Active' ? 'secondary' : 'outline'}>
                             {contract.status}
                           </Badge>
-                          {contract.contractType === 'xol' && contract.xolLayers && (
-                            <Badge variant="outline">
-                              {contract.xolLayers.length} Layers
-                            </Badge>
-                          )}
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
                           <div>
@@ -1177,21 +1210,11 @@ const UnderwritingModuleIntegrated = () => {
                             <p><strong>Period:</strong> {contract.inceptionDate} to {contract.expiryDate}</p>
                             <p><strong>Lines:</strong> {contract.linesOfBusiness.length} selected</p>
                             <p><strong>Commission:</strong> {contract.brokers[0]?.commission || 0}%</p>
+                            {contract.signedShare && (
+                              <p><strong>Signed Share:</strong> {contract.signedShare}%</p>
+                            )}
                           </div>
                         </div>
-                        {contract.contractType === 'xol' && contract.xolLayers && (
-                          <div className="mt-2 p-2 bg-gray-50 rounded">
-                            <p className="text-xs font-medium text-gray-700">XOL Layer Summary:</p>
-                            <div className="text-xs text-gray-600">
-                              {contract.xolLayers.map((layer, idx) => (
-                                <span key={idx}>
-                                  {layer.name}: {layer.participationPercentage}%
-                                  {idx < contract.xolLayers.length - 1 ? ', ' : ''}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                       <div className="flex space-x-2">
                         {contract.status === 'Draft' && (
