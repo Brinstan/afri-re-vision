@@ -2,8 +2,13 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calculator, TrendingUp, DollarSign, FileText, Users, AlertTriangle, BarChart3, Settings, Shield, Building, BookOpen, RefreshCw, LogOut } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { toast } from "@/components/ui/sonner";
+import { Calculator, TrendingUp, DollarSign, FileText, Users, AlertTriangle, BarChart3, Settings, Shield, Building, BookOpen, RefreshCw, LogOut, Moon, Sun } from "lucide-react";
 import { useAuth } from "../components/AuthContext";
+import { useTheme } from "../components/ThemeContext";
+import { useDataStore } from "../components/DataStore";
 import ActuarialEngine from "../components/ActuarialEngine";
 import PricingSystem from "../components/PricingSystem";
 import AccountingModule from "../components/AccountingModule";
@@ -15,12 +20,35 @@ import RetrocessionModule from "../components/RetrocessionModule";
 
 const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("dashboard");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const { treaties, claims, resetData } = useDataStore();
+
+  const handleResetData = () => {
+    resetData();
+    setResetConfirmOpen(false);
+    setSettingsOpen(false);
+    toast.success("Application data has been reset to its initial state");
+  };
+
+  const formatAmount = (amount: number) =>
+    amount >= 1_000_000_000 ? `USD ${(amount / 1_000_000_000).toFixed(1)}B` :
+    amount >= 1_000_000 ? `USD ${(amount / 1_000_000).toFixed(1)}M` :
+    `USD ${amount.toLocaleString()}`;
+
+  const totalPremium = treaties.reduce((sum, t) => sum + t.premium, 0);
+  const outstandingClaims = claims.filter(c => c.status === 'Outstanding');
+  const outstandingClaimsAmount = outstandingClaims.reduce((sum, c) => sum + c.claimAmount, 0);
+  const totalReserves = claims.reduce((sum, c) => sum + c.reserveAmount, 0);
+  const premiumBookingsCount = treaties.reduce((sum, t) => sum + (t.premiumBookings?.length || 0), 0);
+  const retroCoveredTreaties = treaties.filter(t => t.retroPercentage > 0).length;
 
   const kpis = [
-    { title: "Total Premium Volume", value: "USD 2.8B", change: "+12.5%", icon: <DollarSign className="h-4 w-4" /> },
-    { title: "Outstanding Claims", value: "USD 145M", change: "-8.2%", icon: <AlertTriangle className="h-4 w-4" /> },
-    { title: "IBNR Reserves", value: "USD 89M", change: "+3.1%", icon: <Calculator className="h-4 w-4" /> },
+    { title: "Total Premium Volume", value: formatAmount(totalPremium), change: "+12.5%", icon: <DollarSign className="h-4 w-4" /> },
+    { title: "Outstanding Claims", value: formatAmount(outstandingClaimsAmount), change: "-8.2%", icon: <AlertTriangle className="h-4 w-4" /> },
+    { title: "Claim Reserves", value: formatAmount(totalReserves), change: "+3.1%", icon: <Calculator className="h-4 w-4" /> },
     { title: "Solvency Ratio", value: "234%", change: "+5.3%", icon: <TrendingUp className="h-4 w-4" /> }
   ];
 
@@ -159,22 +187,22 @@ const Dashboard = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Active Treaties</p>
-                    <p className="text-2xl font-bold">127</p>
+                    <p className="text-2xl font-bold">{treaties.filter(t => t.status === 'Active').length}</p>
                     <Badge variant="secondary">Auto-linked to Claims & Accounting</Badge>
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Outstanding Claims</p>
-                    <p className="text-2xl font-bold">23</p>
+                    <p className="text-2xl font-bold">{outstandingClaims.length}</p>
                     <Badge variant="secondary">With Auto-Retro Recovery</Badge>
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Premium Bookings</p>
-                    <p className="text-2xl font-bold">89</p>
+                    <p className="text-2xl font-bold">{premiumBookingsCount}</p>
                     <Badge variant="secondary">Real-time Payment Status</Badge>
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Retrocession Covers</p>
-                    <p className="text-2xl font-bold">34</p>
+                    <p className="text-2xl font-bold">{retroCoveredTreaties}</p>
                     <Badge variant="secondary">Auto-allocation Active</Badge>
                   </div>
                 </div>
@@ -208,7 +236,10 @@ const Dashboard = () => {
                 </div>
               )}
               <Badge className="bg-green-100 text-green-800">Online</Badge>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={toggleTheme}>
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
               </Button>
@@ -257,6 +288,66 @@ const Dashboard = () => {
       <main className="p-6">
         {renderMainContent()}
       </main>
+
+      {/* Settings Dialog */}
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Settings</DialogTitle>
+            <DialogDescription>Application preferences and data management</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {user && (
+              <div className="rounded-lg border p-3 text-sm">
+                <p className="font-medium">{user.username}</p>
+                <p className="text-muted-foreground">{user.userType} user</p>
+              </div>
+            )}
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-sm font-medium">Appearance</p>
+                <p className="text-xs text-muted-foreground">Currently using {theme} mode</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={toggleTheme}>
+                Switch to {theme === 'dark' ? 'light' : 'dark'} mode
+              </Button>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-sm font-medium">Application Data</p>
+                <p className="text-xs text-muted-foreground">
+                  {treaties.length} treaties, {claims.length} claims stored locally
+                </p>
+              </div>
+              <Button variant="destructive" size="sm" onClick={() => setResetConfirmOpen(true)}>
+                Reset Data
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSettingsOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Data Confirmation */}
+      <AlertDialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset all application data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all treaties, claims, underwriting contracts, and premium bookings
+              you have created, and restore the initial sample data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetData} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Reset Data
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

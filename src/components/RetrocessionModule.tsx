@@ -8,10 +8,29 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shield, TrendingDown, RefreshCw, Plus, Eye, Search, Download } from "lucide-react";
+import { Shield, TrendingDown, RefreshCw, Plus, Eye, Search, Download, Save } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "@/components/ui/sonner";
 
 const RetrocessionModule = () => {
   const [autoAllocation, setAutoAllocation] = useState(true);
+  const [activeTab, setActiveTab] = useState("program-structure");
+  const [viewedAllocation, setViewedAllocation] = useState(null);
+  const [viewedRetroTreaty, setViewedRetroTreaty] = useState(null);
+
+  // New outward form state
+  const [outwardForm, setOutwardForm] = useState({
+    retroType: '', reinsurer: '', limit: '', retention: '', premium: '', commission: '', inceptionDate: ''
+  });
+
+  // Outward display search state
+  const [searchPolicyNumber, setSearchPolicyNumber] = useState("");
+  const [searchYear, setSearchYear] = useState("");
+
+  // Configuration state
+  const [config, setConfig] = useState({
+    allocationMethod: '', autoThreshold: '', maxRetention: '', reinstatement: ''
+  });
 
   const retroProgram = [
     { id: "RC-CAT-001", type: "Catastrophe XOL", layer: "250M xs 50M", premium: "12,500,000", attachment: 85, coverage: ["Motor", "Property", "Marine"] },
@@ -26,7 +45,7 @@ const RetrocessionModule = () => {
     { treatyId: "MAR-2024-003", treatyType: "Marine Treaty", gross: "12,200,000", retroCeded: "3,050,000", net: "9,150,000", allocation: 75 }
   ];
 
-  const retroTreaties = [
+  const [retroTreaties, setRetroTreaties] = useState([
     {
       outwardPolicyNumber: "OUT-2024-001",
       underwritingYear: "2024",
@@ -54,7 +73,82 @@ const RetrocessionModule = () => {
       premium: 6500000,
       commission: 12.5
     }
-  ];
+  ]);
+
+  // Deterministic utilization per cover (stable across renders)
+  const coverUtilization = (coverId: string) =>
+    30 + (coverId.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 41);
+
+  const handleCreateOutward = () => {
+    if (!outwardForm.retroType || !outwardForm.reinsurer) {
+      toast.error("Select a retrocession type and reinsurer");
+      return;
+    }
+    const premium = parseFloat(outwardForm.premium);
+    if (isNaN(premium) || premium <= 0) {
+      toast.error("Enter a valid premium amount greater than zero");
+      return;
+    }
+
+    const typeNames: Record<string, string> = {
+      'quota-share': 'Quota Share Retro', 'surplus': 'Surplus Retro', 'xol': 'XOL Retro',
+      'cat-xol': 'Cat XOL Retro Cover', 'stop-loss': 'Stop Loss Retro'
+    };
+    const reinsurerNames: Record<string, string> = {
+      'swiss-re': 'Swiss Re', 'munich-re': 'Munich Re', 'lloyds': "Lloyd's of London", 'hannover-re': 'Hannover Re'
+    };
+
+    const limit = parseFloat(outwardForm.limit) || 0;
+    const retention = parseFloat(outwardForm.retention) || 0;
+    const newTreaty = {
+      outwardPolicyNumber: `OUT-${new Date().getFullYear()}-${String(retroTreaties.length + 1).padStart(3, '0')}`,
+      underwritingYear: String(new Date().getFullYear()),
+      treatyName: typeNames[outwardForm.retroType] || 'Retro Cover',
+      reinsurer: reinsurerNames[outwardForm.reinsurer] || outwardForm.reinsurer,
+      coverage: limit > 0 ? `${(limit / 1000000).toFixed(0)}M xs ${(retention / 1000000).toFixed(0)}M` : 'Per agreement',
+      premium,
+      commission: parseFloat(outwardForm.commission) || 0
+    };
+
+    setRetroTreaties(prev => [...prev, newTreaty]);
+    setOutwardForm({ retroType: '', reinsurer: '', limit: '', retention: '', premium: '', commission: '', inceptionDate: '' });
+    setActiveTab("outward-display");
+    toast.success(`Outward treaty ${newTreaty.outwardPolicyNumber} created with ${newTreaty.reinsurer}`);
+  };
+
+  const handleExportRetroTreaty = (treaty) => {
+    const lines = [
+      'OUTWARD RETROCESSION TREATY',
+      `Policy Number: ${treaty.outwardPolicyNumber}`,
+      `Treaty Name: ${treaty.treatyName}`,
+      `Reinsurer: ${treaty.reinsurer}`,
+      `Coverage: ${treaty.coverage}`,
+      `Premium: USD ${treaty.premium.toLocaleString()}`,
+      `Commission: ${treaty.commission}%`,
+      `Underwriting Year: ${treaty.underwritingYear}`
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${treaty.outwardPolicyNumber}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${treaty.outwardPolicyNumber} exported`);
+  };
+
+  const handleSaveConfig = () => {
+    if (!config.allocationMethod) {
+      toast.error("Select an allocation method");
+      return;
+    }
+    toast.success("Retrocession configuration saved");
+  };
+
+  const filteredRetroTreaties = retroTreaties.filter(t =>
+    (!searchPolicyNumber || t.outwardPolicyNumber.toLowerCase().includes(searchPolicyNumber.toLowerCase())) &&
+    (!searchYear || t.underwritingYear === searchYear)
+  );
 
   return (
     <div className="space-y-6">
@@ -64,11 +158,11 @@ const RetrocessionModule = () => {
           <p className="text-gray-600">Comprehensive retrocession allocation and portfolio protection</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => toast.success("Retrocession allocations recalculated across all treaties")}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Recalculate Allocations
           </Button>
-          <Button>
+          <Button onClick={() => setActiveTab("new-outward")}>
             <Plus className="h-4 w-4 mr-2" />
             New Retro Cover
           </Button>
@@ -123,7 +217,7 @@ const RetrocessionModule = () => {
         </Card>
       </div>
 
-      <Tabs defaultValue="program-structure" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="program-structure">Program Structure</TabsTrigger>
           <TabsTrigger value="new-outward">New Outward</TabsTrigger>
@@ -172,9 +266,9 @@ const RetrocessionModule = () => {
                       <div className="space-y-2">
                         <div className="flex justify-between text-xs">
                           <span>Utilization</span>
-                          <span>{Math.round(Math.random() * 40 + 30)}%</span>
+                          <span>{coverUtilization(cover.id)}%</span>
                         </div>
-                        <Progress value={Math.round(Math.random() * 40 + 30)} className="h-2" />
+                        <Progress value={coverUtilization(cover.id)} className="h-2" />
                       </div>
                     </div>
                   ))}
@@ -203,7 +297,7 @@ const RetrocessionModule = () => {
                           <h4 className="font-medium">{treaty.treatyId}</h4>
                           <p className="text-sm text-gray-600">{treaty.treatyType}</p>
                         </div>
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" onClick={() => setViewedAllocation(treaty)}>
                           <Eye className="h-3 w-3 mr-1" />
                           Details
                         </Button>
@@ -253,7 +347,7 @@ const RetrocessionModule = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="retroType">Retrocession Type</Label>
-                  <Select>
+                  <Select value={outwardForm.retroType} onValueChange={(v) => setOutwardForm({ ...outwardForm, retroType: v })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
@@ -268,7 +362,7 @@ const RetrocessionModule = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="reinsurer">Reinsurer</Label>
-                  <Select>
+                  <Select value={outwardForm.reinsurer} onValueChange={(v) => setOutwardForm({ ...outwardForm, reinsurer: v })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select reinsurer" />
                     </SelectTrigger>
@@ -285,30 +379,30 @@ const RetrocessionModule = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="limit">Limit</Label>
-                  <Input id="limit" type="number" placeholder="0" />
+                  <Input id="limit" type="number" placeholder="0" value={outwardForm.limit} onChange={(e) => setOutwardForm({ ...outwardForm, limit: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="retention">Retention</Label>
-                  <Input id="retention" type="number" placeholder="0" />
+                  <Input id="retention" type="number" placeholder="0" value={outwardForm.retention} onChange={(e) => setOutwardForm({ ...outwardForm, retention: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="premium">Premium</Label>
-                  <Input id="premium" type="number" placeholder="0" />
+                  <Input id="premium" type="number" placeholder="0" value={outwardForm.premium} onChange={(e) => setOutwardForm({ ...outwardForm, premium: e.target.value })} />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="commission">Commission %</Label>
-                  <Input id="commission" type="number" step="0.01" placeholder="0.00" />
+                  <Input id="commission" type="number" step="0.01" placeholder="0.00" value={outwardForm.commission} onChange={(e) => setOutwardForm({ ...outwardForm, commission: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="inceptionDate">Inception Date</Label>
-                  <Input id="inceptionDate" type="date" />
+                  <Input id="inceptionDate" type="date" value={outwardForm.inceptionDate} onChange={(e) => setOutwardForm({ ...outwardForm, inceptionDate: e.target.value })} />
                 </div>
               </div>
 
-              <Button>
+              <Button onClick={handleCreateOutward}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Outward Treaty
               </Button>
@@ -329,6 +423,8 @@ const RetrocessionModule = () => {
                   <Input
                     id="outwardPolicyNumber"
                     placeholder="e.g., OUT-2024-001"
+                    value={searchPolicyNumber}
+                    onChange={(e) => setSearchPolicyNumber(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -336,14 +432,15 @@ const RetrocessionModule = () => {
                   <Input
                     id="outwardYear"
                     placeholder="e.g., 2024"
+                    value={searchYear}
+                    onChange={(e) => setSearchYear(e.target.value)}
                   />
                 </div>
               </div>
 
-              <Button>
-                <Search className="h-4 w-4 mr-2" />
-                Search Retro Treaties
-              </Button>
+              <p className="text-sm text-muted-foreground">
+                Showing {filteredRetroTreaties.length} of {retroTreaties.length} retro treaties — results filter as you type
+              </p>
 
               <div className="border rounded-lg">
                 <Table>
@@ -359,7 +456,7 @@ const RetrocessionModule = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {retroTreaties.map((treaty) => (
+                    {filteredRetroTreaties.map((treaty) => (
                       <TableRow key={treaty.outwardPolicyNumber}>
                         <TableCell className="font-medium">{treaty.outwardPolicyNumber}</TableCell>
                         <TableCell>{treaty.treatyName}</TableCell>
@@ -369,11 +466,11 @@ const RetrocessionModule = () => {
                         <TableCell>{treaty.commission}%</TableCell>
                         <TableCell>
                           <div className="flex space-x-1">
-                            <Button size="sm" variant="outline">
+                            <Button size="sm" variant="outline" onClick={() => setViewedRetroTreaty(treaty)}>
                               <Eye className="h-3 w-3 mr-1" />
                               View
                             </Button>
-                            <Button size="sm" variant="outline">
+                            <Button size="sm" variant="outline" onClick={() => handleExportRetroTreaty(treaty)}>
                               <Download className="h-3 w-3 mr-1" />
                               Export
                             </Button>
@@ -398,7 +495,7 @@ const RetrocessionModule = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="allocationMethod">Allocation Method</Label>
-                  <Select>
+                  <Select value={config.allocationMethod} onValueChange={(v) => setConfig({ ...config, allocationMethod: v })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select method" />
                     </SelectTrigger>
@@ -412,17 +509,17 @@ const RetrocessionModule = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="autoThreshold">Auto Allocation Threshold</Label>
-                  <Input id="autoThreshold" type="number" placeholder="1000000" />
+                  <Input id="autoThreshold" type="number" placeholder="1000000" value={config.autoThreshold} onChange={(e) => setConfig({ ...config, autoThreshold: e.target.value })} />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="maxRetention">Maximum Net Retention %</Label>
-                  <Input id="maxRetention" type="number" placeholder="75" />
+                  <Input id="maxRetention" type="number" placeholder="75" value={config.maxRetention} onChange={(e) => setConfig({ ...config, maxRetention: e.target.value })} />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="reinstatement">Reinstatement Handling</Label>
-                  <Select>
+                  <Select value={config.reinstatement} onValueChange={(v) => setConfig({ ...config, reinstatement: v })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select option" />
                     </SelectTrigger>
@@ -433,6 +530,13 @@ const RetrocessionModule = () => {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="mt-4">
+                <Button onClick={handleSaveConfig}>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Configuration
+                </Button>
               </div>
 
               <div className="mt-6 p-4 bg-gray-50 rounded-lg">
@@ -449,6 +553,73 @@ const RetrocessionModule = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Allocation Details Dialog */}
+      <Dialog open={!!viewedAllocation} onOpenChange={(open) => !open && setViewedAllocation(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Allocation Details - {viewedAllocation?.treatyId}</DialogTitle>
+            <DialogDescription>{viewedAllocation?.treatyType}</DialogDescription>
+          </DialogHeader>
+          {viewedAllocation && (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Gross Premium</p>
+                <p className="font-medium">USD {parseInt(viewedAllocation.gross).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Retro Ceded</p>
+                <p className="font-medium">USD {parseInt(viewedAllocation.retroCeded).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Net Retained</p>
+                <p className="font-medium">USD {parseInt(viewedAllocation.net).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Net Retention Ratio</p>
+                <p className="font-medium">{viewedAllocation.allocation}%</p>
+              </div>
+              <div className="col-span-2 text-xs text-muted-foreground">
+                Allocation is applied proportionally across active retrocession covers based on the program structure.
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Retro Treaty View Dialog */}
+      <Dialog open={!!viewedRetroTreaty} onOpenChange={(open) => !open && setViewedRetroTreaty(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{viewedRetroTreaty?.treatyName}</DialogTitle>
+            <DialogDescription>Outward policy {viewedRetroTreaty?.outwardPolicyNumber}</DialogDescription>
+          </DialogHeader>
+          {viewedRetroTreaty && (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Reinsurer</p>
+                <p className="font-medium">{viewedRetroTreaty.reinsurer}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Coverage</p>
+                <p className="font-medium">{viewedRetroTreaty.coverage}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Premium</p>
+                <p className="font-medium">USD {viewedRetroTreaty.premium.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Commission</p>
+                <p className="font-medium">{viewedRetroTreaty.commission}%</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Underwriting Year</p>
+                <p className="font-medium">{viewedRetroTreaty.underwritingYear}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

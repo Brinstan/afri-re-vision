@@ -46,6 +46,29 @@ const ActuarialEngine = () => {
     }, 3000);
   };
 
+  const handleExportResults = () => {
+    const lines = [
+      'ACTUARIAL RESERVE RESULTS',
+      `Method: ${method} | Line of Business: ${lineOfBusiness}`,
+      `Generated: ${new Date().toLocaleString()}`,
+      '',
+      'Year | Ultimate | Paid | Outstanding | IBNR',
+      ...reserveResults.map(r =>
+        `${r.year} | ${r.ultimate.toLocaleString()} | ${r.paid.toLocaleString()} | ${r.outstanding.toLocaleString()} | ${r.ibnr.toLocaleString()}`
+      ),
+      '',
+      'DEVELOPMENT FACTORS',
+      ...developmentFactors.map(f => `${f.period}: ${f.selected}`)
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `actuarial-results-${lineOfBusiness}-${new Date().toISOString().split('T')[0]}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -54,7 +77,7 @@ const ActuarialEngine = () => {
           <p className="text-gray-600">Advanced reserving and loss development calculations</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportResults}>
             <Download className="h-4 w-4 mr-2" />
             Export Results
           </Button>

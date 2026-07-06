@@ -73,7 +73,17 @@ const AccountingModule = () => {
     status: 'Active'
   });
 
-  const { treaties, claims, updateClaim, addPremiumBooking } = useDataStore();
+  const { treaties, claims, updateClaim, addPremiumBooking, updatePremiumPaymentStatus } = useDataStore();
+
+  // New payable form state
+  const [newPayableForm, setNewPayableForm] = useState({
+    type: 'claims',
+    description: '',
+    amount: '',
+    vendor: '',
+    dueDate: ''
+  });
+  const [viewedPayable, setViewedPayable] = useState(null);
 
   // Sample data for investments
   const [investments, setInvestments] = useState([
@@ -193,7 +203,16 @@ const AccountingModule = () => {
     }
 
     const paymentAmount = parseFloat(paymentForm.paymentAmount);
-    const isFullPayment = paymentForm.paymentType === 'full' || paymentAmount >= selectedPayable.amount;
+    const outstanding = selectedPayable.amount - (selectedPayable.paidAmount || 0);
+    if (isNaN(paymentAmount) || paymentAmount <= 0) {
+      toast.error("Payment amount must be greater than zero");
+      return;
+    }
+    if (paymentAmount > outstanding) {
+      toast.error(`Payment cannot exceed the outstanding amount of USD ${outstanding.toLocaleString()}`);
+      return;
+    }
+    const isFullPayment = paymentForm.paymentType === 'full' || paymentAmount >= outstanding;
     
     // Update payable status
     setPayables(prev => prev.map(payable => {
@@ -224,20 +243,16 @@ const AccountingModule = () => {
         paymentReference: paymentForm.reference
       });
 
-      // Create accounting entry for the payment
-      const accountingEntry = {
-        id: Date.now().toString(),
-        amount: paymentAmount,
-        type: 'Claim Payment',
-        date: paymentForm.paymentDate,
-        status: 'Completed',
-        reference: paymentForm.reference,
-        description: `Payment for claim ${selectedPayable.treatyReference}`
-      };
-
-      // Add to treaty's premium bookings for tracking
+      // Record the settlement against the treaty for tracking
       if (selectedPayable.treatyId) {
-        addPremiumBooking(selectedPayable.treatyId, accountingEntry);
+        addPremiumBooking(selectedPayable.treatyId, {
+          id: Date.now().toString(),
+          amount: paymentAmount,
+          type: `Claim Payment (${paymentForm.reference})`,
+          date: paymentForm.paymentDate,
+          status: 'Paid' as const,
+          paidAmount: paymentAmount
+        });
       }
 
       toast.success(`Claim payment processed successfully. Status updated to: ${newClaimStatus}`);
@@ -257,35 +272,79 @@ const AccountingModule = () => {
       notes: ''
     });
 
-    // Refresh payables data
-    setTimeout(() => {
-      setPayables(generatePayables());
-    }, 100);
+  };
+
+  // Refresh payables from source data while preserving recorded payments and manual entries
+  const refreshPayables = () => {
+    setPayables(prev => {
+      const regenerated = generatePayables().map(fresh => {
+        const existing = prev.find(p => p.id === fresh.id);
+        return existing
+          ? { ...fresh, paidAmount: existing.paidAmount, status: existing.status, lastPaymentDate: existing.lastPaymentDate, paymentReference: existing.paymentReference }
+          : fresh;
+      });
+      const manualEntries = prev.filter(p => String(p.id).startsWith('manual_'));
+      return [...regenerated, ...manualEntries];
+    });
+    toast.success("Payables refreshed from treaty and claims data");
   };
 
   // Handle new payable creation
   const handleNewPayable = () => {
+    setNewPayableForm({ type: 'claims', description: '', amount: '', vendor: '', dueDate: '' });
     setShowPayableForm(true);
   };
 
   // Create new payable
   const createNewPayable = () => {
+    if (!newPayableForm.description || !newPayableForm.vendor) {
+      toast.error("Enter a description and vendor for the payable");
+      return;
+    }
+    const amount = parseFloat(newPayableForm.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error("Enter a valid payable amount greater than zero");
+      return;
+    }
+    if (!newPayableForm.dueDate) {
+      toast.error("Select a due date");
+      return;
+    }
+
     const newPayable = {
       id: `manual_${Date.now()}`,
-      type: payableType,
-      description: 'Manual payable entry',
-      amount: 0,
+      type: newPayableForm.type,
+      description: newPayableForm.description,
+      amount,
       paidAmount: 0,
-      dueDate: new Date().toISOString().split('T')[0],
+      dueDate: newPayableForm.dueDate,
       status: 'Outstanding',
-      vendor: 'Manual Entry',
+      vendor: newPayableForm.vendor,
       treatyReference: 'MANUAL',
+      treatyName: 'Manual Entry',
       createdDate: new Date().toISOString().split('T')[0]
     };
 
     setPayables(prev => [...prev, newPayable]);
     setShowPayableForm(false);
-    toast.success("New payable created successfully");
+    toast.success(`Payable "${newPayableForm.description}" created`);
+  };
+
+  // Allocate payment across a treaty's unpaid premium bookings
+  const handleAllocatePayment = (receivable) => {
+    const treaty = treaties.find(t => t.id === receivable.treatyId);
+    if (!treaty || !treaty.premiumBookings) return;
+
+    const unpaidBookings = treaty.premiumBookings.filter(b => b.status !== 'Paid');
+    if (unpaidBookings.length === 0) {
+      toast.info("All premium bookings for this treaty are already settled");
+      return;
+    }
+
+    unpaidBookings.forEach(booking => {
+      updatePremiumPaymentStatus(treaty.id, booking.id, 'Paid', booking.amount);
+    });
+    toast.success(`${unpaidBookings.length} premium booking(s) totalling USD ${receivable.outstanding.toLocaleString()} allocated as paid for ${treaty.treatyName}`);
   };
 
   // Handle investment form submission
@@ -479,11 +538,11 @@ Expenses:
           <p className="text-gray-600">Comprehensive financial management and reporting</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={() => setPayables(generatePayables())}>
+          <Button variant="outline" onClick={refreshPayables}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh Data
           </Button>
-          <Button>
+          <Button onClick={() => setActiveTab('dashboard')}>
             <Calculator className="h-4 w-4 mr-2" />
             Financial Summary
           </Button>
@@ -540,9 +599,14 @@ Expenses:
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAllocatePayment(receivable)}
+                          disabled={receivable.outstanding <= 0}
+                        >
                           <CreditCard className="h-3 w-3 mr-1" />
-                          Allocate Payment
+                          {receivable.outstanding <= 0 ? 'Settled' : 'Allocate Payment'}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -629,7 +693,7 @@ Expenses:
                                 <Wallet className="h-3 w-3 mr-1" />
                                 {payable.status === 'Paid' ? 'Paid' : 'Pay'}
                               </Button>
-                              <Button size="sm" variant="outline">
+                              <Button size="sm" variant="outline" onClick={() => setViewedPayable(payable)}>
                                 <Eye className="h-3 w-3 mr-1" />
                                 View
                               </Button>
@@ -704,7 +768,7 @@ Expenses:
                                 <Wallet className="h-3 w-3 mr-1" />
                                 {payable.status === 'Paid' ? 'Paid' : 'Pay'}
                               </Button>
-                              <Button size="sm" variant="outline">
+                              <Button size="sm" variant="outline" onClick={() => setViewedPayable(payable)}>
                                 <Eye className="h-3 w-3 mr-1" />
                                 View
                               </Button>
@@ -1067,6 +1131,126 @@ Expenses:
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* New Payable Dialog */}
+      <Dialog open={showPayableForm} onOpenChange={setShowPayableForm}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New Payable</DialogTitle>
+            <DialogDescription>Record a manual payable entry</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Payable Type</Label>
+                <Select value={newPayableForm.type} onValueChange={(value) => setNewPayableForm({ ...newPayableForm, type: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="claims">Claims</SelectItem>
+                    <SelectItem value="commissions">Commissions</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Amount (USD) *</Label>
+                <Input
+                  type="number"
+                  value={newPayableForm.amount}
+                  onChange={(e) => setNewPayableForm({ ...newPayableForm, amount: e.target.value })}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Description *</Label>
+              <Input
+                value={newPayableForm.description}
+                onChange={(e) => setNewPayableForm({ ...newPayableForm, description: e.target.value })}
+                placeholder="e.g., Legal fees - claim dispute"
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Vendor / Payee *</Label>
+                <Input
+                  value={newPayableForm.vendor}
+                  onChange={(e) => setNewPayableForm({ ...newPayableForm, vendor: e.target.value })}
+                  placeholder="Vendor name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Due Date *</Label>
+                <Input
+                  type="date"
+                  value={newPayableForm.dueDate}
+                  onChange={(e) => setNewPayableForm({ ...newPayableForm, dueDate: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowPayableForm(false)}>Cancel</Button>
+              <Button onClick={createNewPayable}>
+                <Save className="h-4 w-4 mr-2" />
+                Create Payable
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payable View Dialog */}
+      <Dialog open={!!viewedPayable} onOpenChange={(open) => !open && setViewedPayable(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Payable Details</DialogTitle>
+            <DialogDescription>{viewedPayable?.description}</DialogDescription>
+          </DialogHeader>
+          {viewedPayable && (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Type</p>
+                <p className="font-medium capitalize">{viewedPayable.type}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Status</p>
+                <Badge variant={viewedPayable.status === 'Paid' ? 'secondary' : 'destructive'}>{viewedPayable.status}</Badge>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Total Amount</p>
+                <p className="font-medium">USD {viewedPayable.amount.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Paid Amount</p>
+                <p className="font-medium">USD {(viewedPayable.paidAmount || 0).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Outstanding</p>
+                <p className="font-medium text-red-600">USD {(viewedPayable.amount - (viewedPayable.paidAmount || 0)).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Due Date</p>
+                <p className="font-medium">{viewedPayable.dueDate}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Vendor</p>
+                <p className="font-medium">{viewedPayable.vendor}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Treaty</p>
+                <p className="font-medium">{viewedPayable.treatyName} ({viewedPayable.treatyReference})</p>
+              </div>
+              {viewedPayable.paymentReference && (
+                <div className="col-span-2">
+                  <p className="text-muted-foreground">Last Payment Reference</p>
+                  <p className="font-medium">{viewedPayable.paymentReference} on {viewedPayable.lastPaymentDate}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Payment Processing Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>

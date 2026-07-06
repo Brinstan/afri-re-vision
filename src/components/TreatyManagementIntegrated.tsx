@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/sonner";
 import { Search, FileText, Plus, Calculator, RotateCcw, Download, Eye, DollarSign, CheckCircle, AlertTriangle } from "lucide-react";
 import { useDataStore } from './DataStore';
@@ -23,20 +24,41 @@ const TreatyManagementIntegrated = () => {
   const [bookedPremium, setBookedPremium] = useState("");
   const [brokeragePercentage, setBrokeragePercentage] = useState("25.00");
   const [taxPercentage, setTaxPercentage] = useState("0.00");
-  const [totalAmount, setTotalAmount] = useState("");
-  const [selectedTreaty, setSelectedTreaty] = useState(null);
+  const [bookingDescription, setBookingDescription] = useState("");
+  const [selectedTreatyId, setSelectedTreatyId] = useState<string | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [reversalConfirmOpen, setReversalConfirmOpen] = useState(false);
 
-  const { 
-    treaties, 
-    claims, 
-    getTreatyByContractNumber, 
-    getClaimsByTreaty, 
-    addPremiumBooking, 
-    updatePremiumPaymentStatus 
+  // Monthly returns form state
+  const [returnMonth, setReturnMonth] = useState("");
+  const [returnContract, setReturnContract] = useState("");
+  const [returnType, setReturnType] = useState("");
+  const [grossPremium, setGrossPremium] = useState("");
+  const [netPremium, setNetPremium] = useState("");
+  const [claimsIncurred, setClaimsIncurred] = useState("");
+  const [commissionEarned, setCommissionEarned] = useState("");
+  const [returnNotes, setReturnNotes] = useState("");
+
+  // Inward display search state
+  const [inwardContract, setInwardContract] = useState("");
+  const [inwardYear, setInwardYear] = useState("");
+
+  const {
+    treaties,
+    getTreatyByContractNumber,
+    getClaimsByTreaty,
+    addPremiumBooking,
+    updatePremiumPaymentStatus
   } = useDataStore();
 
+  // Derive the selected treaty from the store so the dialog reflects live updates
+  const selectedTreaty = treaties.find(t => t.id === selectedTreatyId) ?? null;
+
   const handleContractQuery = () => {
+    if (!contractNumber) {
+      toast.error("Enter a contract number first");
+      return;
+    }
     const treaty = getTreatyByContractNumber(contractNumber);
     if (treaty) {
       setBrokeragePercentage(treaty.commission.toString());
@@ -56,11 +78,13 @@ const TreatyManagementIntegrated = () => {
     const brokerageAmount = (premium * brokerageRate) / 100;
     const vatAmount = (premium * 18) / 100; // 18% VAT
     const taxAmount = (premium * taxRate) / 100;
+    const totalAmount = premium + vatAmount + taxAmount;
 
     return {
       brokerageAmount: brokerageAmount.toFixed(2),
       vatAmount: vatAmount.toFixed(2),
-      taxAmount: taxAmount.toFixed(2)
+      taxAmount: taxAmount.toFixed(2),
+      totalAmount: totalAmount.toFixed(2)
     };
   };
 
@@ -73,9 +97,20 @@ const TreatyManagementIntegrated = () => {
       return;
     }
 
+    if (!premiumType) {
+      toast.error("Select a premium type");
+      return;
+    }
+
+    const amount = parseFloat(bookedPremium);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error("Enter a valid premium amount greater than zero");
+      return;
+    }
+
     const newBooking = {
       id: Date.now().toString(),
-      amount: parseFloat(bookedPremium),
+      amount,
       type: premiumType,
       date: new Date().toISOString().split('T')[0],
       status: 'Unpaid' as const,
@@ -83,35 +118,114 @@ const TreatyManagementIntegrated = () => {
     };
 
     addPremiumBooking(treaty.id, newBooking);
-    toast.success("Premium booking created successfully");
-    
+    toast.success(`${premiumType} premium of ${currency} ${amount.toLocaleString()} booked against ${treaty.treatyName}`);
+
     // Reset form
     setShowPremiumForm(false);
     setBookedPremium("");
     setPremiumType("");
-    setTotalAmount("");
+    setBookingDescription("");
   };
 
   const handleReversal = () => {
-    if (confirm("Are you sure you want to reverse this transaction?")) {
-      setPremiumType("");
-      setBookedPremium("");
-      setTotalAmount("");
-      toast.success("Transaction reversed successfully.");
-    }
+    setPremiumType("");
+    setBookedPremium("");
+    setBookingDescription("");
+    setReversalConfirmOpen(false);
+    toast.success("Transaction reversed — form entries cleared");
   };
 
-  const handleViewTreaty = (treaty) => {
-    setSelectedTreaty(treaty);
+  const handleViewTreaty = (treatyId: string) => {
+    setSelectedTreatyId(treatyId);
     setIsViewDialogOpen(true);
   };
 
-  const searchInwardTreaties = (contractNum: string, year: string) => {
-    return treaties.filter(treaty =>
-      (!contractNum || treaty.contractNumber.includes(contractNum)) &&
-      (!year || treaty.inceptionDate.includes(year))
-    );
+  const handleMarkBookingPaid = (bookingId: string, amount: number) => {
+    if (!selectedTreaty) return;
+    updatePremiumPaymentStatus(selectedTreaty.id, bookingId, 'Paid', amount);
+    toast.success("Booking marked as fully paid");
   };
+
+  // Monthly returns: live calculated ratios
+  const returnCalcs = (() => {
+    const gross = parseFloat(grossPremium) || 0;
+    const net = parseFloat(netPremium) || 0;
+    const incurred = parseFloat(claimsIncurred) || 0;
+    const commission = parseFloat(commissionEarned) || 0;
+    const lossRatio = net > 0 ? (incurred / net) * 100 : 0;
+    const commissionRatio = gross > 0 ? (commission / gross) * 100 : 0;
+    const combinedRatio = lossRatio + commissionRatio;
+    const profitLoss = net - incurred - commission;
+    return { lossRatio, commissionRatio, combinedRatio, profitLoss };
+  })();
+
+  const handleBookReturn = () => {
+    if (!returnMonth || !returnContract || !returnType) {
+      toast.error("Select the return month, contract number, and return type");
+      return;
+    }
+    const treaty = getTreatyByContractNumber(returnContract);
+    if (!treaty) {
+      toast.error(`No treaty found for contract ${returnContract}`);
+      return;
+    }
+    const net = parseFloat(netPremium);
+    if (isNaN(net) || net <= 0) {
+      toast.error("Enter a valid net premium earned amount");
+      return;
+    }
+
+    addPremiumBooking(treaty.id, {
+      id: Date.now().toString(),
+      amount: net,
+      type: `Monthly Return (${returnMonth})`,
+      date: new Date().toISOString().split('T')[0],
+      status: 'Unpaid' as const,
+      paidAmount: 0
+    });
+    toast.success(`Monthly return for ${returnMonth} booked against ${treaty.treatyName}`);
+    setReturnMonth("");
+    setReturnContract("");
+    setReturnType("");
+    setGrossPremium("");
+    setNetPremium("");
+    setClaimsIncurred("");
+    setCommissionEarned("");
+    setReturnNotes("");
+  };
+
+  const handleGenerateReturnReport = () => {
+    const rows = [
+      ['Field', 'Value'],
+      ['Return Month', returnMonth || '-'],
+      ['Contract Number', returnContract || '-'],
+      ['Return Type', returnType || '-'],
+      ['Gross Premium Written', grossPremium || '0'],
+      ['Net Premium Earned', netPremium || '0'],
+      ['Claims Incurred', claimsIncurred || '0'],
+      ['Commission Earned', commissionEarned || '0'],
+      ['Loss Ratio %', returnCalcs.lossRatio.toFixed(1)],
+      ['Commission Ratio %', returnCalcs.commissionRatio.toFixed(1)],
+      ['Combined Ratio %', returnCalcs.combinedRatio.toFixed(1)],
+      ['Profit/Loss', returnCalcs.profitLoss.toFixed(2)],
+      ['Notes', returnNotes || '-']
+    ];
+    const csv = rows.map(r => r.map(v => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `monthly-return-${returnMonth || 'draft'}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Monthly return report downloaded");
+  };
+
+  const filteredInwardTreaties = treaties.filter(treaty =>
+    (!inwardContract || treaty.contractNumber.toLowerCase().includes(inwardContract.toLowerCase()) ||
+      treaty.treatyName.toLowerCase().includes(inwardContract.toLowerCase())) &&
+    (!inwardYear || treaty.inceptionDate.startsWith(inwardYear))
+  );
 
   const getTreatyClaimsInfo = (treatyId: string) => {
     const treatyClaims = getClaimsByTreaty(treatyId);
@@ -168,10 +282,7 @@ const TreatyManagementIntegrated = () => {
                   </div>
                 </div>
                 <div className="flex space-x-2">
-                  <Button onClick={() => setShowPremiumForm(true)}>
-                    OK
-                  </Button>
-                  <Button variant="outline" onClick={handleContractQuery}>
+                  <Button onClick={handleContractQuery}>
                     <Search className="h-4 w-4 mr-2" />
                     Query Treaty Data
                   </Button>
@@ -225,6 +336,8 @@ const TreatyManagementIntegrated = () => {
                       id="description"
                       placeholder="Enter premium description..."
                       rows={3}
+                      value={bookingDescription}
+                      onChange={(e) => setBookingDescription(e.target.value)}
                     />
                   </div>
 
@@ -293,15 +406,10 @@ const TreatyManagementIntegrated = () => {
 
                   <div className="bg-green-50 p-4 rounded-lg">
                     <div className="space-y-2">
-                      <Label htmlFor="totalAmount">Total Amount</Label>
-                      <Input
-                        id="totalAmount"
-                        type="number"
-                        value={totalAmount}
-                        onChange={(e) => setTotalAmount(e.target.value)}
-                        placeholder="Enter total amount"
-                        className="font-bold text-lg"
-                      />
+                      <Label>Total Amount (Premium + VAT + Tax)</Label>
+                      <div className="p-2 bg-white rounded border font-bold text-lg">
+                        {currency} {parseFloat(amounts.totalAmount).toLocaleString()}
+                      </div>
                     </div>
                   </div>
 
@@ -310,7 +418,7 @@ const TreatyManagementIntegrated = () => {
                       <FileText className="h-4 w-4 mr-2" />
                       Confirm Booking
                     </Button>
-                    <Button variant="outline" onClick={handleReversal}>
+                    <Button variant="outline" onClick={() => setReversalConfirmOpen(true)}>
                       <RotateCcw className="h-4 w-4 mr-2" />
                       Reverse Transaction
                     </Button>
@@ -334,7 +442,7 @@ const TreatyManagementIntegrated = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="returnMonth">Return Month</Label>
-                  <Select>
+                  <Select value={returnMonth} onValueChange={setReturnMonth}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select month" />
                     </SelectTrigger>
@@ -360,12 +468,14 @@ const TreatyManagementIntegrated = () => {
                   <Input
                     id="returnContract"
                     placeholder="e.g., 12345"
+                    value={returnContract}
+                    onChange={(e) => setReturnContract(e.target.value)}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="returnType">Return Type</Label>
-                  <Select>
+                  <Select value={returnType} onValueChange={setReturnType}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
@@ -386,6 +496,8 @@ const TreatyManagementIntegrated = () => {
                     id="grossPremium"
                     type="number"
                     placeholder="0.00"
+                    value={grossPremium}
+                    onChange={(e) => setGrossPremium(e.target.value)}
                   />
                 </div>
 
@@ -395,6 +507,8 @@ const TreatyManagementIntegrated = () => {
                     id="netPremium"
                     type="number"
                     placeholder="0.00"
+                    value={netPremium}
+                    onChange={(e) => setNetPremium(e.target.value)}
                   />
                 </div>
               </div>
@@ -406,6 +520,8 @@ const TreatyManagementIntegrated = () => {
                     id="claimsIncurred"
                     type="number"
                     placeholder="0.00"
+                    value={claimsIncurred}
+                    onChange={(e) => setClaimsIncurred(e.target.value)}
                   />
                 </div>
 
@@ -415,6 +531,8 @@ const TreatyManagementIntegrated = () => {
                     id="commissionEarned"
                     type="number"
                     placeholder="0.00"
+                    value={commissionEarned}
+                    onChange={(e) => setCommissionEarned(e.target.value)}
                   />
                 </div>
               </div>
@@ -425,6 +543,8 @@ const TreatyManagementIntegrated = () => {
                   id="returnNotes"
                   placeholder="Enter any additional notes for this return..."
                   rows={3}
+                  value={returnNotes}
+                  onChange={(e) => setReturnNotes(e.target.value)}
                 />
               </div>
 
@@ -432,22 +552,24 @@ const TreatyManagementIntegrated = () => {
                 <h4 className="font-medium text-blue-900 mb-2">Calculated Results</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p>Loss Ratio: <span className="font-bold">68.5%</span></p>
-                    <p>Commission Ratio: <span className="font-bold">25.0%</span></p>
+                    <p>Loss Ratio: <span className="font-bold">{returnCalcs.lossRatio.toFixed(1)}%</span></p>
+                    <p>Commission Ratio: <span className="font-bold">{returnCalcs.commissionRatio.toFixed(1)}%</span></p>
                   </div>
                   <div>
-                    <p>Combined Ratio: <span className="font-bold">93.5%</span></p>
-                    <p>Profit/Loss: <span className="font-bold text-green-600">+USD 125,000</span></p>
+                    <p>Combined Ratio: <span className="font-bold">{returnCalcs.combinedRatio.toFixed(1)}%</span></p>
+                    <p>Profit/Loss: <span className={`font-bold ${returnCalcs.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {returnCalcs.profitLoss >= 0 ? '+' : '-'}USD {Math.abs(returnCalcs.profitLoss).toLocaleString()}
+                    </span></p>
                   </div>
                 </div>
               </div>
 
               <div className="flex space-x-2">
-                <Button>
+                <Button onClick={handleBookReturn}>
                   <Plus className="h-4 w-4 mr-2" />
                   Book Return
                 </Button>
-                <Button variant="outline">
+                <Button variant="outline" onClick={handleGenerateReturnReport}>
                   <Download className="h-4 w-4 mr-2" />
                   Generate Report
                 </Button>
@@ -468,7 +590,9 @@ const TreatyManagementIntegrated = () => {
                   <Label htmlFor="inwardContract">Contract Number</Label>
                   <Input
                     id="inwardContract"
-                    placeholder="e.g., 12345"
+                    placeholder="Contract number or treaty name"
+                    value={inwardContract}
+                    onChange={(e) => setInwardContract(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -476,19 +600,20 @@ const TreatyManagementIntegrated = () => {
                   <Input
                     id="inwardYear"
                     placeholder="e.g., 2024"
+                    value={inwardYear}
+                    onChange={(e) => setInwardYear(e.target.value)}
                   />
                 </div>
               </div>
 
-              <div className="flex space-x-2">
-                <Button>
-                  <Search className="h-4 w-4 mr-2" />
-                  Search
+              <div className="flex space-x-2 items-center">
+                <Button variant="outline" onClick={() => { setInwardContract(""); setInwardYear(""); }}>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Clear Filters
                 </Button>
-                <Button variant="outline">
-                  <Search className="h-4 w-4 mr-2" />
-                  Advanced Query
-                </Button>
+                <p className="text-sm text-muted-foreground">
+                  Showing {filteredInwardTreaties.length} of {treaties.length} treaties — results filter as you type
+                </p>
               </div>
 
               {/* Search Results */}
@@ -507,7 +632,7 @@ const TreatyManagementIntegrated = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {treaties.map((treaty) => {
+                    {filteredInwardTreaties.map((treaty) => {
                       const claimsInfo = getTreatyClaimsInfo(treaty.id);
                       const premiumStatus = treaty.premiumBookings?.some(b => b.status === 'Unpaid') ? 'Outstanding' : 'Current';
                       
@@ -533,11 +658,17 @@ const TreatyManagementIntegrated = () => {
                           <TableCell>{treaty.retroPercentage}%</TableCell>
                           <TableCell>
                             <div className="flex space-x-1">
-                              <Button size="sm" variant="outline" onClick={() => handleViewTreaty(treaty)}>
+                              <Button size="sm" variant="outline" onClick={() => handleViewTreaty(treaty.id)}>
                                 <Eye className="h-3 w-3 mr-1" />
                                 View
                               </Button>
-                              <Button size="sm" variant="outline">
+                              <Button size="sm" variant="outline" onClick={() => {
+                                if (claimsInfo.totalClaims === 0) {
+                                  toast.info(`No claims recorded for ${treaty.treatyName}`);
+                                } else {
+                                  handleViewTreaty(treaty.id);
+                                }
+                              }}>
                                 <FileText className="h-3 w-3 mr-1" />
                                 Claims
                               </Button>
@@ -548,11 +679,33 @@ const TreatyManagementIntegrated = () => {
                     })}
                   </TableBody>
                 </Table>
+                {filteredInwardTreaties.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No treaties match your search.</p>
+                    <p className="text-sm">Adjust the filters or clear them to see all treaties.</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Reversal Confirmation */}
+      <AlertDialog open={reversalConfirmOpen} onOpenChange={setReversalConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reverse this transaction?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will clear the premium type, amount, and description you have entered. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReversal}>Reverse Transaction</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Treaty Details Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
@@ -601,12 +754,15 @@ const TreatyManagementIntegrated = () => {
                   <CardContent className="space-y-2 text-sm">
                     {(() => {
                       const claimsInfo = getTreatyClaimsInfo(selectedTreaty.id);
+                      const outstandingAmount = claimsInfo.claims
+                        .filter(c => c.status === 'Outstanding')
+                        .reduce((sum, c) => sum + c.claimAmount, 0);
                       return (
                         <>
                           <p><strong>Total Claims:</strong> {claimsInfo.totalClaims}</p>
-                          <p><strong>Claims Paid:</strong> USD {claimsInfo.totalClaimsPaid.toLocaleString()}</p>
+                          <p><strong>Claims Incurred:</strong> USD {claimsInfo.totalClaimsPaid.toLocaleString()}</p>
                           <p><strong>Loss Ratio:</strong> {selectedTreaty.premium > 0 ? ((claimsInfo.totalClaimsPaid / selectedTreaty.premium) * 100).toFixed(1) : 0}%</p>
-                          <p><strong>Outstanding:</strong> USD 0</p>
+                          <p><strong>Outstanding:</strong> USD {outstandingAmount.toLocaleString()}</p>
                         </>
                       );
                     })()}
@@ -647,10 +803,17 @@ const TreatyManagementIntegrated = () => {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Button size="sm" variant="outline">
-                              <DollarSign className="h-3 w-3 mr-1" />
-                              Update Payment
-                            </Button>
+                            {booking.status !== 'Paid' ? (
+                              <Button size="sm" variant="outline" onClick={() => handleMarkBookingPaid(booking.id, booking.amount)}>
+                                <DollarSign className="h-3 w-3 mr-1" />
+                                Mark as Paid
+                              </Button>
+                            ) : (
+                              <Badge variant="secondary">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Settled
+                              </Badge>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}

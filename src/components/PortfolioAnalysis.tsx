@@ -34,8 +34,13 @@ const PortfolioAnalysis = () => {
   const [analysisType, setAnalysisType] = useState("comprehensive");
   const [timeframe, setTimeframe] = useState("ytd");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [selectedPortfolio, setSelectedPortfolio] = useState(null);
+  const [selectedPortfolio, setSelectedPortfolio] = useState<{ title: string; subtitle: string; rows: Array<[string, string]> } | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+
+  const openDetail = (title: string, subtitle: string, rows: Array<[string, string]>) => {
+    setSelectedPortfolio({ title, subtitle, rows });
+    setIsDetailDialogOpen(true);
+  };
   const [filterLob, setFilterLob] = useState("all");
   const [filterRegion, setFilterRegion] = useState("all");
 
@@ -686,7 +691,17 @@ This analysis is based on current portfolio data and market conditions.
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" onClick={() => openDetail(
+                          `${lob} — Line of Business Detail`,
+                          `${data.treatyCount} treaties in portfolio`,
+                          [
+                            ['Premium Volume', `USD ${(data.premium / 1000000).toFixed(1)}M`],
+                            ['Claims Incurred', `USD ${(data.claims / 1000000).toFixed(1)}M`],
+                            ['Loss Ratio', `${data.lossRatio.toFixed(1)}%`],
+                            ['Average Premium', `USD ${(data.avgPremium / 1000000).toFixed(1)}M`],
+                            ['Profitability Rating', data.profitability]
+                          ]
+                        )}>
                           <Eye className="h-3 w-3 mr-1" />
                           Details
                         </Button>
@@ -735,7 +750,16 @@ This analysis is based on current portfolio data and market conditions.
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" onClick={() => openDetail(
+                          `${country} — Geographic Analysis`,
+                          `${data.treatyCount} treaties in this region`,
+                          [
+                            ['Market Share', `${data.marketShare.toFixed(1)}%`],
+                            ['Premium Volume', `USD ${(data.premium / 1000000).toFixed(1)}M`],
+                            ['Claims Incurred', `USD ${(data.claims / 1000000).toFixed(1)}M`],
+                            ['Risk Level', data.riskLevel]
+                          ]
+                        )}>
                           <Eye className="h-3 w-3 mr-1" />
                           Analyze
                         </Button>
@@ -817,6 +841,26 @@ This analysis is based on current portfolio data and market conditions.
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Detail Dialog */}
+      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="capitalize">{selectedPortfolio?.title}</DialogTitle>
+            <DialogDescription>{selectedPortfolio?.subtitle}</DialogDescription>
+          </DialogHeader>
+          {selectedPortfolio && (
+            <div className="space-y-2">
+              {selectedPortfolio.rows.map(([label, value]) => (
+                <div key={label} className="flex justify-between border-b pb-2 text-sm">
+                  <span className="text-muted-foreground">{label}</span>
+                  <span className="font-medium">{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

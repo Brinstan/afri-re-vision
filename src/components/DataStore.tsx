@@ -1,6 +1,22 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 // Global data store for cross-module integration
+export interface PremiumBooking {
+  id: string;
+  amount: number;
+  type: string;
+  date: string;
+  status: 'Paid' | 'Partially Paid' | 'Unpaid';
+  paidAmount?: number;
+}
+
+export interface LayerAllocation {
+  layerName: string;
+  allocation: number;
+  reinstatementPremium?: number;
+}
+
 interface Treaty {
   id: string;
   contractNumber: string;
@@ -27,14 +43,7 @@ interface Treaty {
   }>;
   deductible?: number;
   insuredName?: string;
-  premiumBookings?: Array<{
-    id: string;
-    amount: number;
-    type: string;
-    date: string;
-    status: 'Paid' | 'Partially Paid' | 'Unpaid';
-    paidAmount?: number;
-  }>;
+  premiumBookings?: PremiumBooking[];
 }
 
 interface Claim {
@@ -53,7 +62,7 @@ interface Claim {
   claimDescription: string;
   retroRecovery?: number;
   reinstatementPremium?: number;
-  layerDistribution?: any[];
+  layerDistribution?: LayerAllocation[];
 }
 
 interface UnderwritingContract {
@@ -101,11 +110,14 @@ interface DataStore {
   convertUnderwritingToTreaty: (contractId: string) => void;
   
   // Premium booking actions
-  addPremiumBooking: (treatyId: string, booking: any) => void;
-  updatePremiumPaymentStatus: (treatyId: string, bookingId: string, status: string, paidAmount?: number) => void;
+  addPremiumBooking: (treatyId: string, booking: PremiumBooking) => void;
+  updatePremiumPaymentStatus: (treatyId: string, bookingId: string, status: PremiumBooking['status'], paidAmount?: number) => void;
+
+  // Utility actions
+  resetData: () => void;
 }
 
-export const useDataStore = create<DataStore>((set, get) => ({
+const initialData: Pick<DataStore, 'treaties' | 'claims' | 'underwritingContracts'> = {
   treaties: [
     {
       id: '1',
@@ -198,7 +210,11 @@ export const useDataStore = create<DataStore>((set, get) => ({
       inceptionDate: '2024-06-01',
       expiryDate: '2025-05-31'
     }
-  ],
+  ]
+};
+
+export const useDataStore = create<DataStore>()(persist((set, get) => ({
+  ...initialData,
 
   // Treaty actions
   addTreaty: (treaty) => set((state) => ({
@@ -288,17 +304,19 @@ export const useDataStore = create<DataStore>((set, get) => ({
   })),
   
   updatePremiumPaymentStatus: (treatyId, bookingId, status, paidAmount) => set((state) => ({
-    treaties: state.treaties.map(treaty => 
-      treaty.id === treatyId 
+    treaties: state.treaties.map(treaty =>
+      treaty.id === treatyId
         ? {
             ...treaty,
             premiumBookings: treaty.premiumBookings?.map(booking =>
-              booking.id === bookingId 
-                ? { ...booking, status: status as any, paidAmount }
+              booking.id === bookingId
+                ? { ...booking, status, paidAmount }
                 : booking
             )
           }
         : treaty
     )
-  }))
-}));
+  })),
+
+  resetData: () => set(() => ({ ...initialData }))
+}), { name: 'afrirevision-data' }));

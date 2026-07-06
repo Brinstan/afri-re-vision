@@ -9,12 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/sonner";
-import { Plus, FileText, Save, Eye, Users, Building, CheckCircle, ArrowRight, Trash2, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, FileText, Save, Eye, Users, Building, CheckCircle, ArrowRight, Trash2, AlertTriangle, RotateCcw } from "lucide-react";
 import { useDataStore } from './DataStore';
 
 const UnderwritingModuleIntegrated = () => {
   const [contractType, setContractType] = useState("quota");
-  const [selectedLines, setSelectedLines] = useState([]);
+  const [selectedLines, setSelectedLines] = useState<string[]>([]);
   const [brokers, setBrokers] = useState([{ id: 1, name: "", reference: "", commission: "" }]);
   const [cedants, setCedants] = useState([{ id: 1, name: "", reference: "", country: "" }]);
   const [contractNumber, setContractNumber] = useState("");
@@ -40,7 +41,23 @@ const UnderwritingModuleIntegrated = () => {
   const [surplusError, setSurplusError] = useState("");
   const [facultativeError, setFacultativeError] = useState("");
 
-  const { addUnderwritingContract, convertUnderwritingToTreaty, underwritingContracts } = useDataStore();
+  // Supplementary contract terms (coverage, financial, clauses tabs)
+  const [terms, setTerms] = useState<Record<string, string>>({});
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [viewedContract, setViewedContract] = useState<typeof underwritingContracts[number] | null>(null);
+
+  const { addUnderwritingContract, convertUnderwritingToTreaty, underwritingContracts, treaties } = useDataStore();
+
+  const term = (key: string) => ({
+    value: terms[key] ?? "",
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setTerms(t => ({ ...t, [key]: e.target.value }))
+  });
+
+  const termSelect = (key: string) => ({
+    value: terms[key] ?? "",
+    onValueChange: (value: string) => setTerms(t => ({ ...t, [key]: value }))
+  });
 
   const linesOfBusiness = [
     { id: "motor", name: "Motor Insurance", code: "MOT" },
@@ -170,15 +187,42 @@ const UnderwritingModuleIntegrated = () => {
     return isValid;
   };
 
-  const handleSaveContract = () => {
-    // Validation
+  const validateContract = () => {
     if (!contractNumber || !treatyName || !premium || !inceptionDate || !expiryDate) {
-      toast.error("Please fill in all required fields");
-      return;
+      toast.error("Please fill in all required fields (contract number, treaty name, premium, dates)");
+      return false;
+    }
+
+    if (parseFloat(premium) <= 0 || isNaN(parseFloat(premium))) {
+      toast.error("Premium must be a positive amount");
+      return false;
+    }
+
+    if (new Date(expiryDate) <= new Date(inceptionDate)) {
+      toast.error("Expiry date must be after the inception date");
+      return false;
+    }
+
+    if (selectedLines.length === 0) {
+      toast.error("Please select at least one line of business");
+      return false;
     }
 
     if (cedants.some(c => !c.name) || brokers.some(b => !b.name)) {
       toast.error("Please complete all cedant and broker information");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSaveContract = () => {
+    if (!validateContract()) return;
+
+    // Duplicate prevention across underwriting contracts and treaties
+    if (underwritingContracts.some(c => c.contractNumber === contractNumber) ||
+        treaties.some(t => t.contractNumber === contractNumber)) {
+      toast.error(`Contract number ${contractNumber} already exists. Use a unique contract number.`);
       return;
     }
 
@@ -212,23 +256,37 @@ const UnderwritingModuleIntegrated = () => {
       signedShare: contractType === "stoploss" ? parseFloat(stopLossSignedShare) :
                    contractType === "surplus" ? parseFloat(surplusSignedShare) :
                    contractType === "facultative" ? parseFloat(facultativeSignedShare) : null,
-      xolLayers: contractType === "xol" ? xolLayers : null
+      xolLayers: contractType === "xol" ? xolLayers : null,
+      terms
     };
 
     addUnderwritingContract(newContract);
-    toast.success("Underwriting contract saved successfully");
+    toast.success(`Contract ${contractNumber} saved as draft. Convert it to a treaty from the Saved Contracts tab.`);
+    resetForm();
+  };
 
-    // Reset form
+  const resetForm = () => {
     setContractNumber("");
     setTreatyName("");
     setPremium("");
+    setInceptionDate("");
+    setExpiryDate("");
     setSelectedLines([]);
     setBrokers([{ id: 1, name: "", reference: "", commission: "" }]);
     setCedants([{ id: 1, name: "", reference: "", country: "" }]);
     setStopLossSignedShare("100.00");
     setSurplusSignedShare("100.00");
     setFacultativeSignedShare("100.00");
+    setStopLossError("");
+    setSurplusError("");
+    setFacultativeError("");
     setXolLayers([{ id: 1, name: "Layer 1", limit: "", retention: "", rate: "", participation: "100.00" }]);
+    setTerms({});
+  };
+
+  const handleResetForm = () => {
+    resetForm();
+    toast.info("Form cleared");
   };
 
   const handleConvertToTreaty = (contractId: string) => {
@@ -280,7 +338,11 @@ const UnderwritingModuleIntegrated = () => {
           <p className="text-gray-600">Comprehensive treaty and policy underwriting with automatic treaty conversion</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleResetForm}>
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Reset
+          </Button>
+          <Button variant="outline" onClick={() => setPreviewOpen(true)}>
             <Eye className="h-4 w-4 mr-2" />
             Preview Contract
           </Button>
@@ -386,11 +448,11 @@ const UnderwritingModuleIntegrated = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="dateAccepted">Date Accepted</Label>
-                  <Input id="dateAccepted" type="date" />
+                  <Input id="dateAccepted" type="date" {...term('dateAccepted')} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="dateConfirmed">Date Confirmed</Label>
-                  <Input id="dateConfirmed" type="date" />
+                  <Input id="dateConfirmed" type="date" {...term('dateConfirmed')} />
                 </div>
               </CardContent>
             </Card>
@@ -426,7 +488,7 @@ const UnderwritingModuleIntegrated = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="processingType">Processing Type</Label>
-                  <Select>
+                  <Select {...termSelect('processingType')}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
@@ -439,7 +501,7 @@ const UnderwritingModuleIntegrated = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="contractStatus">Contract Status</Label>
-                  <Select>
+                  <Select {...termSelect('contractStatus')}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
@@ -540,7 +602,7 @@ const UnderwritingModuleIntegrated = () => {
                     </div>
                     <div className="space-y-2">
                       <Label>Country</Label>
-                      <Select onValueChange={(value) => updateCedant(cedant.id, 'country', value)}>
+                      <Select value={cedant.country} onValueChange={(value) => updateCedant(cedant.id, 'country', value)}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select country" />
                         </SelectTrigger>
@@ -624,15 +686,15 @@ const UnderwritingModuleIntegrated = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="cessionPercentage">Cession Percentage</Label>
-                    <Input id="cessionPercentage" type="number" step="0.01" placeholder="50.00" />
+                    <Input id="cessionPercentage" type="number" step="0.01" placeholder="50.00" {...term('cessionPercentage')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="commissionRate">Commission Rate %</Label>
-                    <Input id="commissionRate" type="number" step="0.01" placeholder="25.00" />
+                    <Input id="commissionRate" type="number" step="0.01" placeholder="25.00" {...term('commissionRate')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="profitCommission">Profit Commission %</Label>
-                    <Input id="profitCommission" type="number" step="0.01" placeholder="20.00" />
+                    <Input id="profitCommission" type="number" step="0.01" placeholder="20.00" {...term('profitCommission')} />
                   </div>
                 </div>
               </CardContent>
@@ -757,11 +819,11 @@ const UnderwritingModuleIntegrated = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="coverageLimit">Coverage Limit %</Label>
-                    <Input id="coverageLimit" type="number" step="0.01" placeholder="90.00" />
+                    <Input id="coverageLimit" type="number" step="0.01" placeholder="90.00" {...term('coverageLimit')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="attachmentPoint">Attachment Point %</Label>
-                    <Input id="attachmentPoint" type="number" step="0.01" placeholder="80.00" />
+                    <Input id="attachmentPoint" type="number" step="0.01" placeholder="80.00" {...term('attachmentPoint')} />
                   </div>
                   <PercentageInput
                     value={stopLossSignedShare}
@@ -774,7 +836,7 @@ const UnderwritingModuleIntegrated = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="coveragePeriod">Coverage Period</Label>
-                    <Select>
+                    <Select {...termSelect('coveragePeriod')}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select period" />
                       </SelectTrigger>
@@ -791,6 +853,7 @@ const UnderwritingModuleIntegrated = () => {
                       id="applicableRisks"
                       placeholder="Describe applicable risks..."
                       rows={2}
+                      {...term('applicableRisks')}
                     />
                   </div>
                 </div>
@@ -808,15 +871,15 @@ const UnderwritingModuleIntegrated = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="numberOfLines">Number of Lines</Label>
-                    <Input id="numberOfLines" type="number" placeholder="9" />
+                    <Input id="numberOfLines" type="number" placeholder="9" {...term('numberOfLines')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="retentionAmount">Retention Amount</Label>
-                    <Input id="retentionAmount" type="number" placeholder="1000000" />
+                    <Input id="retentionAmount" type="number" placeholder="1000000" {...term('retentionAmount')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="maxLine">Maximum Line</Label>
-                    <Input id="maxLine" type="number" placeholder="10000000" />
+                    <Input id="maxLine" type="number" placeholder="10000000" {...term('maxLine')} />
                   </div>
                   <PercentageInput
                     value={surplusSignedShare}
@@ -829,7 +892,7 @@ const UnderwritingModuleIntegrated = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="coveragePeriodSurplus">Coverage Period</Label>
-                    <Select>
+                    <Select {...termSelect('coveragePeriodSurplus')}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select period" />
                       </SelectTrigger>
@@ -846,6 +909,7 @@ const UnderwritingModuleIntegrated = () => {
                       id="applicableRisksSurplus"
                       placeholder="Describe applicable risks..."
                       rows={2}
+                      {...term('applicableRisksSurplus')}
                     />
                   </div>
                 </div>
@@ -863,11 +927,11 @@ const UnderwritingModuleIntegrated = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="coverageLimitFac">Coverage Limit</Label>
-                    <Input id="coverageLimitFac" type="number" placeholder="5000000" />
+                    <Input id="coverageLimitFac" type="number" placeholder="5000000" {...term('coverageLimitFac')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="retentionLevelFac">Retention Level</Label>
-                    <Input id="retentionLevelFac" type="number" placeholder="500000" />
+                    <Input id="retentionLevelFac" type="number" placeholder="500000" {...term('retentionLevelFac')} />
                   </div>
                   <PercentageInput
                     value={facultativeSignedShare}
@@ -880,7 +944,7 @@ const UnderwritingModuleIntegrated = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="coveragePeriodFac">Coverage Period</Label>
-                    <Select>
+                    <Select {...termSelect('coveragePeriodFac')}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select period" />
                       </SelectTrigger>
@@ -897,6 +961,7 @@ const UnderwritingModuleIntegrated = () => {
                       id="riskAssessment"
                       placeholder="Enter risk assessment notes..."
                       rows={2}
+                      {...term('riskAssessment')}
                     />
                   </div>
                 </div>
@@ -915,25 +980,25 @@ const UnderwritingModuleIntegrated = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="premiumRate">Premium Rate %</Label>
-                    <Input id="premiumRate" type="number" step="0.01" placeholder="5.00" />
+                    <Input id="premiumRate" type="number" step="0.01" placeholder="5.00" {...term('premiumRate')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="minimumPremiumSL">Minimum Premium</Label>
-                    <Input id="minimumPremiumSL" type="number" placeholder="100000" />
+                    <Input id="minimumPremiumSL" type="number" placeholder="100000" {...term('minimumPremiumSL')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="maximumPremiumSL">Maximum Premium</Label>
-                    <Input id="maximumPremiumSL" type="number" placeholder="1000000" />
+                    <Input id="maximumPremiumSL" type="number" placeholder="1000000" {...term('maximumPremiumSL')} />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="commissionStructureSL">Commission Structure</Label>
-                    <Input id="commissionStructureSL" type="number" step="0.01" placeholder="15.00" />
+                    <Input id="commissionStructureSL" type="number" step="0.01" placeholder="15.00" {...term('commissionStructureSL')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="lossParticipationSL">Loss Participation %</Label>
-                    <Input id="lossParticipationSL" type="number" step="0.01" placeholder="10.00" />
+                    <Input id="lossParticipationSL" type="number" step="0.01" placeholder="10.00" {...term('lossParticipationSL')} />
                   </div>
                 </div>
               </CardContent>
@@ -949,15 +1014,15 @@ const UnderwritingModuleIntegrated = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="commissionRateSurplus">Commission Rate %</Label>
-                    <Input id="commissionRateSurplus" type="number" step="0.01" placeholder="25.00" />
+                    <Input id="commissionRateSurplus" type="number" step="0.01" placeholder="25.00" {...term('commissionRateSurplus')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="profitCommissionSurplus">Profit Commission %</Label>
-                    <Input id="profitCommissionSurplus" type="number" step="0.01" placeholder="20.00" />
+                    <Input id="profitCommissionSurplus" type="number" step="0.01" placeholder="20.00" {...term('profitCommissionSurplus')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="slidingScale">Sliding Scale</Label>
-                    <Select>
+                    <Select {...termSelect('slidingScale')}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select option" />
                       </SelectTrigger>
@@ -971,7 +1036,7 @@ const UnderwritingModuleIntegrated = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="premiumCalculationSurplus">Premium Calculation Method</Label>
-                    <Select>
+                    <Select {...termSelect('premiumCalculationSurplus')}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select method" />
                       </SelectTrigger>
@@ -984,7 +1049,7 @@ const UnderwritingModuleIntegrated = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="paymentTermsSurplus">Payment Terms</Label>
-                    <Select>
+                    <Select {...termSelect('paymentTermsSurplus')}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select terms" />
                       </SelectTrigger>
@@ -1009,25 +1074,25 @@ const UnderwritingModuleIntegrated = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="premiumRateFac">Premium Rate %</Label>
-                    <Input id="premiumRateFac" type="number" step="0.01" placeholder="8.50" />
+                    <Input id="premiumRateFac" type="number" step="0.01" placeholder="8.50" {...term('premiumRateFac')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="commissionFac">Commission %</Label>
-                    <Input id="commissionFac" type="number" step="0.01" placeholder="25.00" />
+                    <Input id="commissionFac" type="number" step="0.01" placeholder="25.00" {...term('commissionFac')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="brokerageFac">Brokerage %</Label>
-                    <Input id="brokerageFac" type="number" step="0.01" placeholder="5.00" />
+                    <Input id="brokerageFac" type="number" step="0.01" placeholder="5.00" {...term('brokerageFac')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="taxesFac">Taxes %</Label>
-                    <Input id="taxesFac" type="number" step="0.01" placeholder="2.00" />
+                    <Input id="taxesFac" type="number" step="0.01" placeholder="2.00" {...term('taxesFac')} />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="paymentTermsFac">Payment Terms</Label>
-                    <Select>
+                    <Select {...termSelect('paymentTermsFac')}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select terms" />
                       </SelectTrigger>
@@ -1041,7 +1106,7 @@ const UnderwritingModuleIntegrated = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="currencySpecFac">Currency Specifications</Label>
-                    <Select>
+                    <Select {...termSelect('currencySpecFac')}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select currency" />
                       </SelectTrigger>
@@ -1067,15 +1132,15 @@ const UnderwritingModuleIntegrated = () => {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="estimatedPremium">Estimated Annual Premium</Label>
-                    <Input id="estimatedPremium" type="number" placeholder="2500000" />
+                    <Input id="estimatedPremium" type="number" placeholder="2500000" {...term('estimatedPremium')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="minimumPremium">Minimum Premium</Label>
-                    <Input id="minimumPremium" type="number" placeholder="1000000" />
+                    <Input id="minimumPremium" type="number" placeholder="1000000" {...term('minimumPremium')} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="depositPremium">Deposit Premium</Label>
-                    <Input id="depositPremium" type="number" placeholder="750000" />
+                    <Input id="depositPremium" type="number" placeholder="750000" {...term('depositPremium')} />
                   </div>
                 </CardContent>
               </Card>
@@ -1087,7 +1152,7 @@ const UnderwritingModuleIntegrated = () => {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="paymentTerms">Payment Terms</Label>
-                    <Select>
+                    <Select {...termSelect('paymentTerms')}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select terms" />
                       </SelectTrigger>
@@ -1101,7 +1166,7 @@ const UnderwritingModuleIntegrated = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="settlementTerms">Settlement Terms</Label>
-                    <Select>
+                    <Select {...termSelect('settlementTerms')}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select settlement" />
                       </SelectTrigger>
@@ -1115,7 +1180,7 @@ const UnderwritingModuleIntegrated = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="interestRate">Interest Rate % (Late Payment)</Label>
-                    <Input id="interestRate" type="number" step="0.01" placeholder="1.50" />
+                    <Input id="interestRate" type="number" step="0.01" placeholder="1.50" {...term('interestRate')} />
                   </div>
                 </CardContent>
               </Card>
@@ -1135,6 +1200,7 @@ const UnderwritingModuleIntegrated = () => {
                   id="specialConditions"
                   placeholder="Enter any special conditions or clauses..."
                   rows={4}
+                  {...term('specialConditions')}
                 />
               </div>
               <div className="space-y-2">
@@ -1143,12 +1209,13 @@ const UnderwritingModuleIntegrated = () => {
                   id="exclusions"
                   placeholder="Specify any exclusions..."
                   rows={3}
+                  {...term('exclusions')}
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="jurisdiction">Jurisdiction</Label>
-                  <Select>
+                  <Select {...termSelect('jurisdiction')}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select jurisdiction" />
                     </SelectTrigger>
@@ -1161,7 +1228,7 @@ const UnderwritingModuleIntegrated = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="arbitration">Arbitration</Label>
-                  <Select>
+                  <Select {...termSelect('arbitration')}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select arbitration" />
                     </SelectTrigger>
@@ -1233,7 +1300,7 @@ const UnderwritingModuleIntegrated = () => {
                             Converted to Treaty
                           </Badge>
                         )}
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" onClick={() => setViewedContract(contract)}>
                           <Eye className="h-3 w-3 mr-1" />
                           View
                         </Button>
@@ -1253,6 +1320,130 @@ const UnderwritingModuleIntegrated = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Contract Preview Dialog */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Contract Preview</DialogTitle>
+            <DialogDescription>Review the contract details before saving</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-muted-foreground">Contract Number</p>
+              <p className="font-medium">{contractNumber || '—'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Treaty Name</p>
+              <p className="font-medium">{treatyName || '—'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Contract Type</p>
+              <p className="font-medium capitalize">{contractType}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Underwriting Year</p>
+              <p className="font-medium">{underwritingYear}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Premium</p>
+              <p className="font-medium">{premium ? `${currency} ${parseFloat(premium).toLocaleString()}` : '—'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Period</p>
+              <p className="font-medium">{inceptionDate && expiryDate ? `${inceptionDate} to ${expiryDate}` : '—'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Cedants</p>
+              <p className="font-medium">{cedants.filter(c => c.name).map(c => c.name).join(', ') || '—'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Brokers</p>
+              <p className="font-medium">{brokers.filter(b => b.name).map(b => b.name).join(', ') || '—'}</p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-muted-foreground">Lines of Business</p>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {selectedLines.length > 0 ? selectedLines.map(lineId => (
+                  <Badge key={lineId} variant="secondary">
+                    {linesOfBusiness.find(l => l.id === lineId)?.name}
+                  </Badge>
+                )) : <span className="font-medium">—</span>}
+              </div>
+            </div>
+            {contractType === 'xol' && (
+              <div className="col-span-2">
+                <p className="text-muted-foreground">XOL Layers</p>
+                {xolLayers.map(layer => (
+                  <p key={layer.id} className="font-medium">
+                    {layer.name}: limit {layer.limit || '—'}, retention {layer.retention || '—'}, participation {layer.participation}%
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewOpen(false)}>Close</Button>
+            <Button onClick={() => { setPreviewOpen(false); handleSaveContract(); }}>
+              <Save className="h-4 w-4 mr-2" />
+              Save Contract
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Saved Contract View Dialog */}
+      <Dialog open={!!viewedContract} onOpenChange={(open) => !open && setViewedContract(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{viewedContract?.treatyName}</DialogTitle>
+            <DialogDescription>Contract {viewedContract?.contractNumber} — {viewedContract?.status}</DialogDescription>
+          </DialogHeader>
+          {viewedContract && (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Type</p>
+                <p className="font-medium capitalize">{viewedContract.contractType}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Underwriting Year</p>
+                <p className="font-medium">{viewedContract.underwritingYear}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Premium</p>
+                <p className="font-medium">{viewedContract.currency} {viewedContract.premium.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Period</p>
+                <p className="font-medium">{viewedContract.inceptionDate} to {viewedContract.expiryDate}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Cedants</p>
+                {viewedContract.cedants.map((c, i) => (
+                  <p key={i} className="font-medium">{c.name} ({c.country})</p>
+                ))}
+              </div>
+              <div>
+                <p className="text-muted-foreground">Brokers</p>
+                {viewedContract.brokers.map((b, i) => (
+                  <p key={i} className="font-medium">{b.name} — {b.commission}% commission</p>
+                ))}
+              </div>
+              <div className="col-span-2">
+                <p className="text-muted-foreground">Lines of Business</p>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {viewedContract.linesOfBusiness.map(line => (
+                    <Badge key={line} variant="secondary" className="capitalize">{line}</Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewedContract(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

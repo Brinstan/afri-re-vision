@@ -22,49 +22,48 @@ const ClaimsModuleLinked = () => {
   const [reserveAmount, setReserveAmount] = useState("");
   const [claimAmount, setClaimAmount] = useState("");
   const [currency, setCurrency] = useState("USD");
+  const [claimDescription, setClaimDescription] = useState("");
+  const [dateOfLoss, setDateOfLoss] = useState("");
+  const [pendingClaimNumber, setPendingClaimNumber] = useState("");
   const [searchClaimNumber, setSearchClaimNumber] = useState("");
   const [searchDateOfLoss, setSearchDateOfLoss] = useState("");
+  const [outstandingSearch, setOutstandingSearch] = useState("");
   const [selectedClaim, setSelectedClaim] = useState(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  
+
   // Edit claim states
   const [editingClaim, setEditingClaim] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  const { 
-    treaties, 
-    claims, 
-    getTreatyByContractNumber, 
-    addClaim, 
+  const {
+    treaties,
+    claims,
+    getTreatyByContractNumber,
+    addClaim,
     updateClaim,
-    addPremiumBooking 
+    updateTreaty,
+    addPremiumBooking
   } = useDataStore();
 
   // Generate standardized claim reference number
-  const generateClaimReference = (type: string, businessClass: string) => {
-    const typeMap = {
-      "Motor": "MV",
-      "Fire": "F", 
-      "Engineering": "ENG",
-      "Accident": "A",
-      "Marine": "M"
-    };
-    
-    const businessMap = {
+  const generateClaimReference = (businessClass: string) => {
+    const businessMap: Record<string, string> = {
       "XOL": "TTY",
       "Facultative": "FAC",
       "Large Risk": "POL"
     };
 
     const year = new Date().getFullYear();
-    const sequential = String(Math.floor(Math.random() * 9999)).padStart(4, '0');
-    
-    return `TAN/${typeMap["Motor"] || 'MV'}/${businessMap[businessClass] || 'TTY'}/${year}/${sequential}`;
+    const sequential = String(claims.length + 1).padStart(4, '0');
+
+    return `TAN/MV/${businessMap[businessClass] || 'TTY'}/${year}/${sequential}`;
   };
 
   const handleClaimTypeSelection = (type: string) => {
     setClaimType(type);
+    // Generate the reference once so the displayed number matches the saved claim
+    setPendingClaimNumber(generateClaimReference(type));
     setShowClaimForm(true);
   };
 
@@ -143,12 +142,32 @@ const ClaimsModuleLinked = () => {
   const handleClaimSubmission = () => {
     const treaty = getTreatyByContractNumber(contractNumber);
     if (!treaty) {
-      toast.error("Treaty not found");
+      toast.error("Treaty not found — enter a valid contract number to link the claim");
       return;
     }
 
-    const claimNumber = generateClaimReference("Motor", claimType);
-    
+    const claimAmt = parseFloat(claimAmount);
+    const reserveAmt = parseFloat(reserveAmount);
+    if (isNaN(claimAmt) || claimAmt <= 0) {
+      toast.error("Enter a valid claim amount greater than zero");
+      return;
+    }
+    if (isNaN(reserveAmt) || reserveAmt <= 0) {
+      toast.error("Enter a valid reserve amount greater than zero");
+      return;
+    }
+    if (!dateOfLoss) {
+      toast.error("Enter the date of loss");
+      return;
+    }
+    if (new Date(dateOfLoss) > new Date()) {
+      toast.error("Date of loss cannot be in the future");
+      return;
+    }
+
+    const claimNumber = pendingClaimNumber || generateClaimReference(claimType);
+    const today = new Date().toISOString().split('T')[0];
+
     // Create new claim
     const newClaim = {
       id: Date.now().toString(),
@@ -156,36 +175,45 @@ const ClaimsModuleLinked = () => {
       contractNumber,
       treatyId: treaty.id,
       insuredName: treaty.insuredName || "Unknown",
-      claimAmount: parseFloat(claimAmount),
-      reserveAmount: parseFloat(reserveAmount),
+      claimAmount: claimAmt,
+      reserveAmount: reserveAmt,
       currency,
       status: "Outstanding",
-      dateOfLoss: new Date().toISOString().split('T')[0],
-      dateReported: new Date().toISOString().split('T')[0],
-      dateApproved: new Date().toISOString().split('T')[0],
-      claimDescription: "New claim submission",
+      dateOfLoss,
+      dateReported: today,
+      dateApproved: today,
+      claimDescription: claimDescription || `${claimType} claim against ${treaty.treatyName}`,
       retroRecovery: calculations?.retroRecovery || 0,
       reinstatementPremium: calculations?.totalReinstatement || 0,
       layerDistribution: calculations?.layerDistribution || []
     };
 
     addClaim(newClaim);
-    
+
+    // Update treaty layer remaining capacity so subsequent claims see the reduced capacity
+    if (calculations && treaty.layers) {
+      const updatedLayers = treaty.layers.map(layer => {
+        const hit = calculations.layerDistribution.find(l => l.layerName === layer.name);
+        return hit ? { ...layer, remainingCapacity: hit.remainingCapacityAfter } : layer;
+      });
+      updateTreaty(treaty.id, { layers: updatedLayers });
+    }
+
     // Auto-book reinstatement premium if applicable
     if (calculations && calculations.totalReinstatement > 0) {
       const reinstatementBooking = {
         id: Date.now().toString() + "_reinst",
         amount: calculations.totalReinstatement,
         type: "Reinstatement",
-        date: new Date().toISOString().split('T')[0],
+        date: today,
         status: 'Unpaid' as const,
         paidAmount: 0
       };
-      
+
       addPremiumBooking(treaty.id, reinstatementBooking);
       toast.info(`Reinstatement premium of USD ${calculations.totalReinstatement.toLocaleString()} has been automatically booked.`);
     }
-    
+
     toast.success(`Claim ${claimNumber} has been created and linked to treaty ${treaty.treatyName}.`);
 
     // Reset form
@@ -193,6 +221,51 @@ const ClaimsModuleLinked = () => {
     setClaimAmount("");
     setReserveAmount("");
     setContractNumber("");
+    setClaimDescription("");
+    setDateOfLoss("");
+    setPendingClaimNumber("");
+  };
+
+  const downloadDocument = (title: string, filename: string) => {
+    const treaty = getTreatyByContractNumber(contractNumber);
+    if (!treaty || !claimAmount) {
+      toast.error("Link a treaty and enter a claim amount before generating documents");
+      return;
+    }
+    const lines = [
+      `${title}`,
+      `Generated: ${new Date().toLocaleString()}`,
+      ``,
+      `Claim Reference: ${pendingClaimNumber}`,
+      `Contract Number: ${contractNumber}`,
+      `Treaty: ${treaty.treatyName}`,
+      `Cedant: ${treaty.cedant}`,
+      `Insured: ${treaty.insuredName || 'Unknown'}`,
+      `Date of Loss: ${dateOfLoss || '-'}`,
+      `Claim Amount: ${currency} ${parseFloat(claimAmount).toLocaleString()}`,
+      `Reserve Amount: ${currency} ${(parseFloat(reserveAmount) || 0).toLocaleString()}`,
+      ...(calculations ? [
+        `Total Payable: ${currency} ${calculations.totalPayable.toLocaleString()}`,
+        `Reinstatement Premium: ${currency} ${calculations.totalReinstatement.toLocaleString()}`,
+        `Retro Recovery: ${currency} ${calculations.retroRecovery.toLocaleString()}`,
+        `Net Exposure: ${currency} ${calculations.netExposure.toLocaleString()}`
+      ] : []),
+      ``,
+      `Description: ${claimDescription || '-'}`
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${title} downloaded`);
+  };
+
+  const handlePayClaim = (claim) => {
+    updateClaim(claim.id, { status: 'Full Payment' });
+    toast.success(`Claim ${claim.claimNumber} marked as fully paid`);
   };
 
   // Edit claim functionality
@@ -367,7 +440,7 @@ const ClaimsModuleLinked = () => {
                       <Label htmlFor="referenceNumber">Claim Reference Number</Label>
                       <Input
                         id="referenceNumber"
-                        value={generateClaimReference("Motor", claimType)}
+                        value={pendingClaimNumber}
                         disabled
                         className="font-mono"
                       />
@@ -401,15 +474,26 @@ const ClaimsModuleLinked = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="claimAmount">Claim Amount (for payment)</Label>
-                    <Input
-                      id="claimAmount"
-                      type="number"
-                      value={claimAmount}
-                      onChange={(e) => setClaimAmount(e.target.value)}
-                      placeholder="0.00"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="claimAmount">Claim Amount (for payment)</Label>
+                      <Input
+                        id="claimAmount"
+                        type="number"
+                        value={claimAmount}
+                        onChange={(e) => setClaimAmount(e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dateOfLoss">Date of Loss</Label>
+                      <Input
+                        id="dateOfLoss"
+                        type="date"
+                        value={dateOfLoss}
+                        onChange={(e) => setDateOfLoss(e.target.value)}
+                      />
+                    </div>
                   </div>
 
                   {claimType === "XOL" && calculations && (
@@ -509,6 +593,8 @@ const ClaimsModuleLinked = () => {
                       id="claimDescription"
                       placeholder="Enter claim details..."
                       rows={3}
+                      value={claimDescription}
+                      onChange={(e) => setClaimDescription(e.target.value)}
                     />
                   </div>
 
@@ -517,11 +603,11 @@ const ClaimsModuleLinked = () => {
                       <FileText className="h-4 w-4 mr-2" />
                       Submit Claim
                     </Button>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={() => downloadDocument('CLAIM ADVICE', `claim-advice-${pendingClaimNumber.replace(/\//g, '-')}.txt`)}>
                       <Download className="h-4 w-4 mr-2" />
                       Download Claim Advice
                     </Button>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={() => downloadDocument('PAYMENT VOUCHER', `payment-voucher-${pendingClaimNumber.replace(/\//g, '-')}.txt`)}>
                       <Download className="h-4 w-4 mr-2" />
                       Payment Voucher
                     </Button>
@@ -624,10 +710,9 @@ const ClaimsModuleLinked = () => {
                 </div>
               </div>
 
-              <Button>
-                <Search className="h-4 w-4 mr-2" />
-                Search Claims
-              </Button>
+              <p className="text-sm text-muted-foreground">
+                Showing {searchClaims().length} of {claims.length} claims — results filter as you type
+              </p>
 
               <div className="border rounded-lg">
                 <Table>
@@ -683,11 +768,15 @@ const ClaimsModuleLinked = () => {
                   <Input
                     id="outstandingSearch"
                     placeholder="Enter claim reference number"
+                    value={outstandingSearch}
+                    onChange={(e) => setOutstandingSearch(e.target.value)}
                   />
-                  <Button>
-                    <Search className="h-4 w-4 mr-2" />
-                    Search
-                  </Button>
+                  {outstandingSearch && (
+                    <Button variant="outline" onClick={() => setOutstandingSearch("")}>
+                      <X className="h-4 w-4 mr-2" />
+                      Clear
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -706,7 +795,10 @@ const ClaimsModuleLinked = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {claims.filter(claim => claim.status === 'Outstanding').map((claim) => {
+                    {claims.filter(claim =>
+                      claim.status === 'Outstanding' &&
+                      (!outstandingSearch || claim.claimNumber.toLowerCase().includes(outstandingSearch.toLowerCase()))
+                    ).map((claim) => {
                       const retroRecovery = claim.retroRecovery || 0;
                       const netExposure = claim.claimAmount - retroRecovery;
                       
@@ -736,7 +828,7 @@ const ClaimsModuleLinked = () => {
                                 <Edit className="h-3 w-3 mr-1" />
                                 Edit
                               </Button>
-                              <Button size="sm">
+                              <Button size="sm" onClick={() => handlePayClaim(claim)}>
                                 <DollarSign className="h-3 w-3 mr-1" />
                                 Pay
                               </Button>
