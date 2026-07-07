@@ -6,7 +6,7 @@
 // store, every operational action anywhere in the app automatically produces
 // the corresponding accounting entries — no module needs to post explicitly.
 
-import type { Claim, Investment, ManualJournal, Treaty } from '@/components/DataStore';
+import type { Claim, Investment, ManualJournal, RetroClaim, RetroProgramme, Treaty } from '@/components/DataStore';
 import { claimIncurred, claimPaid } from '@/lib/actuarial';
 import { accountName } from './chartOfAccounts';
 import { Journal, JournalLine } from './types';
@@ -45,9 +45,15 @@ export const deriveJournals = (
   treaties: Treaty[],
   claims: Claim[],
   investments: Investment[],
-  totalIbnr: number
+  totalIbnr: number,
+  retroProgrammes: RetroProgramme[] = [],
+  retroClaims: RetroClaim[] = []
 ): Journal[] => {
   const journals: Journal[] = [];
+  // When retro programmes exist they are the source of truth for outward
+  // premium — the per-treaty retroPercentage journal is skipped to avoid
+  // double-counting the cession.
+  const useProgrammeRetro = retroProgrammes.length > 0;
 
   treaties.forEach(treaty => {
     (treaty.premiumBookings ?? []).forEach(booking => {
@@ -91,9 +97,10 @@ export const deriveJournals = (
       ));
     }
 
-    // 4) Retrocession premium ceded
+    // 4) Retrocession premium ceded (legacy per-treaty basis, only when no
+    //    retro programmes are defined)
     const retroPremium = treaty.premium * treaty.retroPercentage / 100;
-    if (retroPremium > 0) {
+    if (retroPremium > 0 && !useProgrammeRetro) {
       journals.push(journal(
         `JN-RP-${treaty.id}`, treaty.inceptionDate, treaty.contractNumber, treaty.currency,
         [line('5200', retroPremium, 0), line('2200', 0, retroPremium)],
@@ -165,7 +172,42 @@ export const deriveJournals = (
     }
   });
 
-  // 10) IFRS/actuarial adjustment: IBNR provision (adjusted TB only)
+  // 10) Retro programme premiums and override commission (per layer)
+  retroProgrammes.forEach(programme => {
+    programme.layers.forEach(layer => {
+      if (layer.premium > 0) {
+        journals.push(journal(
+          `JN-RPP-${layer.id}`, programme.effectiveDate, programme.programmeCode, programme.currency,
+          [line('5200', layer.premium, 0), line('2200', 0, layer.premium)],
+          'Retrocession Premium',
+          `Retro premium — ${programme.programmeName} / ${layer.name}`
+        ));
+      }
+    });
+    const totalPremium = programme.layers.reduce((s, l) => s + l.premium, 0);
+    const commission = totalPremium * programme.commissionPct / 100;
+    if (commission > 0) {
+      journals.push(journal(
+        `JN-RPC-${programme.id}`, programme.effectiveDate, programme.programmeCode, programme.currency,
+        [line('2200', commission, 0), line('4110', 0, commission)],
+        'Retrocession Premium',
+        `Override commission ${programme.commissionPct}% — ${programme.programmeName}`
+      ));
+    }
+  });
+
+  // 11) Settled retro recoveries: cash received against the recoverable
+  retroClaims.filter(rc => rc.status === 'Settled' && rc.settledRecovery > 0).forEach(rc => {
+    const programme = retroProgrammes.find(p => p.id === rc.programmeId);
+    journals.push(journal(
+      `JN-RS-${rc.id}`, rc.settlementDate ?? rc.notificationDate, rc.id, programme?.currency ?? 'USD',
+      [line('1010', rc.settledRecovery, 0), line('1200', 0, rc.settledRecovery)],
+      'Retrocession Recovery',
+      `Retro recovery settled — ${programme?.programmeCode ?? rc.programmeId}`
+    ));
+  });
+
+  // 12) IFRS/actuarial adjustment: IBNR provision (adjusted TB only)
   if (totalIbnr > 0) {
     journals.push(journal(
       `JN-IBNR`, new Date().toISOString().split('T')[0], 'ACTUARIAL-IBNR', 'USD',
@@ -196,7 +238,9 @@ export const allJournals = (
   claims: Claim[],
   investments: Investment[],
   manualJournals: ManualJournal[],
-  totalIbnr: number
+  totalIbnr: number,
+  retroProgrammes: RetroProgramme[] = [],
+  retroClaims: RetroClaim[] = []
 ): Journal[] =>
-  [...deriveJournals(treaties, claims, investments, totalIbnr), ...manualJournals.map(manualToJournal)]
+  [...deriveJournals(treaties, claims, investments, totalIbnr, retroProgrammes, retroClaims), ...manualJournals.map(manualToJournal)]
     .sort((a, b) => a.postingDate.localeCompare(b.postingDate));

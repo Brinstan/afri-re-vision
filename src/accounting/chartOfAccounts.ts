@@ -34,6 +34,7 @@ export const BASE_ACCOUNTS: Account[] = [
   { code: '4000', name: 'Gross Written Premium', category: 'Revenue', normalSide: 'credit', description: 'Insurance revenue — inward reinsurance premium' },
   { code: '4010', name: 'Reinstatement Premium Income', category: 'Revenue', parent: '4000', normalSide: 'credit' },
   { code: '4100', name: 'Retrocession Recovery Income', category: 'Revenue', normalSide: 'credit', description: 'Reinsurance revenue — recoveries on ceded business' },
+  { code: '4110', name: 'Retro Commission Income', category: 'Revenue', parent: '4100', normalSide: 'credit', description: 'Override commission on outward retrocession placements' },
   { code: '4200', name: 'Investment Income', category: 'Revenue', normalSide: 'credit' },
   { code: '4300', name: 'Exchange Gain', category: 'Revenue', normalSide: 'credit' },
 

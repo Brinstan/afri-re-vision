@@ -133,6 +133,67 @@ export interface ManualJournal {
   adjustment: boolean;           // included only in the adjusted trial balance
 }
 
+// ---- Retrocession (Stage 5) ------------------------------------------------
+
+export interface Retrocessionaire {
+  id: string;
+  name: string;
+  country: string;
+  creditRating: string;            // e.g. 'AA-'
+  financialStrength: string;       // e.g. 'Superior'
+  capacityOffered: number;         // total capacity offered across programmes
+  notes?: string;
+}
+
+export interface RetroPlacement {
+  retrocessionaireId: string;
+  signedLinePct: number;           // % of the layer taken
+  slipStatus: 'Quoted' | 'Signed' | 'Bound' | 'Declined';
+}
+
+export interface RetroLayer {
+  id: string;
+  name: string;
+  attachmentPoint: number;
+  limit: number;                   // layer width
+  premium: number;                 // layer retro premium
+  placements: RetroPlacement[];    // signed lines should total 100%
+}
+
+export interface RetroProgramme {
+  id: string;
+  programmeCode: string;           // e.g. RP-2024-001
+  programmeName: string;
+  type: 'Quota Share' | 'Surplus' | 'XOL' | 'Stop Loss' | 'Facultative' | 'Catastrophe' | 'Aggregate';
+  effectiveDate: string;
+  expiryDate: string;
+  currency: string;
+  linesOfBusiness: string[];
+  territory: string;
+  cedingCompany: string;           // usually AfriRe itself
+  retroBroker: string;
+  retention: number;               // amount retained before the programme attaches
+  cessionPct?: number;             // for proportional types
+  commissionPct: number;           // retro/override commission received
+  layers: RetroLayer[];
+  status: 'Active' | 'Pending' | 'Expired' | 'Cancelled';
+  renewalStatus: 'New' | 'Renewal' | 'Mid-term Adjustment';
+}
+
+export interface RetroClaim {
+  id: string;
+  originalClaimId: string;         // links to Claim
+  programmeId: string;             // links to RetroProgramme
+  layerId: string;
+  notificationDate: string;
+  expectedRecovery: number;
+  settledRecovery: number;
+  settlementDate?: string;
+  status: 'Notified' | 'Approved' | 'Settled' | 'Disputed';
+  disputeReason?: string;
+  notes?: string;
+}
+
 export interface AuditEntry {
   id: string;
   timestamp: string;
@@ -153,6 +214,9 @@ interface DataStore {
   bankAccounts: BankAccount[];
   manualJournals: ManualJournal[];
   auditLog: AuditEntry[];
+  retroProgrammes: RetroProgramme[];
+  retroClaims: RetroClaim[];
+  retrocessionaires: Retrocessionaire[];
 
   // Treaty actions
   addTreaty: (treaty: Treaty) => void;
@@ -183,6 +247,14 @@ interface DataStore {
   // Manual journal actions
   addManualJournal: (journal: ManualJournal) => void;
 
+  // Retrocession actions
+  addRetroProgramme: (programme: RetroProgramme) => void;
+  updateRetroProgramme: (id: string, updates: Partial<RetroProgramme>) => void;
+  addRetroClaim: (retroClaim: RetroClaim) => void;
+  updateRetroClaim: (id: string, updates: Partial<RetroClaim>) => void;
+  addRetrocessionaire: (counterparty: Retrocessionaire) => void;
+  updateRetrocessionaire: (id: string, updates: Partial<Retrocessionaire>) => void;
+
   // Audit trail
   logAudit: (entry: Omit<AuditEntry, 'id' | 'timestamp' | 'user'>) => void;
 
@@ -204,7 +276,7 @@ const auditEntry = (entry: Omit<AuditEntry, 'id' | 'timestamp' | 'user'>): Audit
   ...entry
 });
 
-const initialData: Pick<DataStore, 'treaties' | 'claims' | 'underwritingContracts' | 'investments' | 'bankAccounts' | 'manualJournals' | 'auditLog'> = {
+const initialData: Pick<DataStore, 'treaties' | 'claims' | 'underwritingContracts' | 'investments' | 'bankAccounts' | 'manualJournals' | 'auditLog' | 'retroProgrammes' | 'retroClaims' | 'retrocessionaires'> = {
   treaties: [
     {
       id: '1',
@@ -342,7 +414,92 @@ const initialData: Pick<DataStore, 'treaties' | 'claims' | 'underwritingContract
   ],
 
   manualJournals: [],
-  auditLog: []
+  auditLog: [],
+
+  retrocessionaires: [
+    { id: 'rc1', name: 'Swiss Re', country: 'Switzerland', creditRating: 'AA-', financialStrength: 'Superior', capacityOffered: 200000000 },
+    { id: 'rc2', name: 'Munich Re', country: 'Germany', creditRating: 'AA', financialStrength: 'Superior', capacityOffered: 250000000 },
+    { id: 'rc3', name: "Lloyd's Syndicate 2001", country: 'United Kingdom', creditRating: 'A+', financialStrength: 'Excellent', capacityOffered: 100000000 },
+    { id: 'rc4', name: 'Africa Re', country: 'Nigeria', creditRating: 'A', financialStrength: 'Excellent', capacityOffered: 80000000 }
+  ],
+
+  retroProgrammes: [
+    {
+      id: 'rp1',
+      programmeCode: 'RP-2024-001',
+      programmeName: 'Catastrophe XOL Programme 2024',
+      type: 'Catastrophe',
+      effectiveDate: '2024-01-01',
+      expiryDate: '2024-12-31',
+      currency: 'USD',
+      linesOfBusiness: ['Motor', 'Property'],
+      territory: 'East Africa',
+      cedingCompany: 'AfriRe Tanzania',
+      retroBroker: 'Guy Carpenter',
+      retention: 2000000,
+      commissionPct: 10,
+      status: 'Active',
+      renewalStatus: 'Renewal',
+      layers: [
+        {
+          id: 'rl1', name: 'Layer 1 — 8M xs 2M', attachmentPoint: 2000000, limit: 8000000, premium: 1200000,
+          placements: [
+            { retrocessionaireId: 'rc1', signedLinePct: 40, slipStatus: 'Bound' },
+            { retrocessionaireId: 'rc2', signedLinePct: 35, slipStatus: 'Bound' },
+            { retrocessionaireId: 'rc4', signedLinePct: 25, slipStatus: 'Bound' }
+          ]
+        },
+        {
+          id: 'rl2', name: 'Layer 2 — 15M xs 10M', attachmentPoint: 10000000, limit: 15000000, premium: 900000,
+          placements: [
+            { retrocessionaireId: 'rc2', signedLinePct: 50, slipStatus: 'Bound' },
+            { retrocessionaireId: 'rc3', signedLinePct: 50, slipStatus: 'Bound' }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'rp2',
+      programmeCode: 'RP-2024-002',
+      programmeName: 'Whole Account Quota Share 2024',
+      type: 'Quota Share',
+      effectiveDate: '2024-01-01',
+      expiryDate: '2024-12-31',
+      currency: 'USD',
+      linesOfBusiness: ['Motor', 'Property', 'Marine'],
+      territory: 'East Africa',
+      cedingCompany: 'AfriRe Tanzania',
+      retroBroker: 'AON Re',
+      retention: 0,
+      cessionPct: 25,
+      commissionPct: 22.5,
+      status: 'Active',
+      renewalStatus: 'New',
+      layers: [
+        {
+          id: 'rl3', name: '25% Whole Account QS', attachmentPoint: 0, limit: 30000000, premium: 11062500,
+          placements: [
+            { retrocessionaireId: 'rc1', signedLinePct: 60, slipStatus: 'Bound' },
+            { retrocessionaireId: 'rc3', signedLinePct: 40, slipStatus: 'Bound' }
+          ]
+        }
+      ]
+    }
+  ],
+
+  retroClaims: [
+    {
+      id: 'rcl1',
+      originalClaimId: '1',
+      programmeId: 'rp1',
+      layerId: 'rl1',
+      notificationDate: '2024-11-20',
+      expectedRecovery: 500000,
+      settledRecovery: 0,
+      status: 'Notified',
+      notes: 'Motor treaty large loss — first layer attachment breached'
+    }
+  ]
 };
 
 export const useDataStore = create<DataStore>()(persist((set, get) => ({
@@ -515,6 +672,63 @@ export const useDataStore = create<DataStore>()(persist((set, get) => ({
     auditLog: [...state.auditLog, auditEntry({
       action: 'CREATE', entity: 'Journal', entityId: journal.id, sourceModule: 'Accounting',
       newValue: `${journal.debitAccount} / ${journal.creditAccount} ${journal.amount.toLocaleString()} — ${journal.narration}`
+    })]
+  })),
+
+  // Retrocession actions
+  addRetroProgramme: (programme) => set((state) => ({
+    retroProgrammes: [...state.retroProgrammes, programme],
+    auditLog: [...state.auditLog, auditEntry({
+      action: 'CREATE', entity: 'RetroProgramme', entityId: programme.programmeCode,
+      sourceModule: 'Retrocession', newValue: programme.programmeName
+    })]
+  })),
+
+  updateRetroProgramme: (id, updates) => set((state) => {
+    const prev = state.retroProgrammes.find(p => p.id === id);
+    return {
+      retroProgrammes: state.retroProgrammes.map(p => p.id === id ? { ...p, ...updates } : p),
+      auditLog: [...state.auditLog, auditEntry({
+        action: 'UPDATE', entity: 'RetroProgramme', entityId: prev?.programmeCode ?? id,
+        sourceModule: 'Retrocession', newValue: Object.keys(updates).join(', ')
+      })]
+    };
+  }),
+
+  addRetroClaim: (retroClaim) => set((state) => ({
+    retroClaims: [...state.retroClaims, retroClaim],
+    auditLog: [...state.auditLog, auditEntry({
+      action: 'CREATE', entity: 'RetroClaim', entityId: retroClaim.id,
+      sourceModule: 'Retrocession', newValue: `Expected recovery ${retroClaim.expectedRecovery.toLocaleString()}`
+    })]
+  })),
+
+  updateRetroClaim: (id, updates) => set((state) => {
+    const prev = state.retroClaims.find(c => c.id === id);
+    return {
+      retroClaims: state.retroClaims.map(c => c.id === id ? { ...c, ...updates } : c),
+      auditLog: [...state.auditLog, auditEntry({
+        action: updates.settledRecovery !== undefined ? 'PAYMENT' : 'UPDATE',
+        entity: 'RetroClaim', entityId: id, sourceModule: 'Retrocession',
+        previousValue: prev?.status,
+        newValue: updates.status ?? Object.keys(updates).join(', ')
+      })]
+    };
+  }),
+
+  addRetrocessionaire: (counterparty) => set((state) => ({
+    retrocessionaires: [...state.retrocessionaires, counterparty],
+    auditLog: [...state.auditLog, auditEntry({
+      action: 'CREATE', entity: 'Retrocessionaire', entityId: counterparty.id,
+      sourceModule: 'Retrocession', newValue: `${counterparty.name} (${counterparty.creditRating})`
+    })]
+  })),
+
+  updateRetrocessionaire: (id, updates) => set((state) => ({
+    retrocessionaires: state.retrocessionaires.map(r => r.id === id ? { ...r, ...updates } : r),
+    auditLog: [...state.auditLog, auditEntry({
+      action: 'UPDATE', entity: 'Retrocessionaire', entityId: id,
+      sourceModule: 'Retrocession', newValue: Object.keys(updates).join(', ')
     })]
   })),
 

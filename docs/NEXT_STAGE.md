@@ -1,9 +1,11 @@
 # Next Stage — Recommendation
 
-Three stages have taken AfriReVision through the full technical reinsurance lifecycle
-**client-side**. The single biggest limitation now is that everything lives in one
+Five stages have taken AfriReVision through the full technical reinsurance lifecycle
+**client-side**: operations (Stage 1), actuarial (2), IFRS 17 (3), accounting (4), and
+retrocession (5). The single biggest limitation remains that everything lives in one
 browser. The recommended next stage is therefore **persistence, identity, and period
-close** — the foundation that unlocks real-world use.
+close** — the foundation that unlocks real-world use. (The other open candidate is the
+Pricing Engine, the last module still on illustrative metrics.)
 
 ## Stage 4 (recommended): Backend, Auth & Period Close
 

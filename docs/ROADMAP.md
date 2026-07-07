@@ -15,6 +15,20 @@ Bornhuetter-Ferguson / Cape Cod / Expected Loss Ratio, simplified Mack standard 
 inflation/trend adjustment, diagnostics, XOL analytics, portfolio analytics, charts,
 and exports. Actuary-selectable preferred method.
 
+### Stage 5 — Enterprise Retrocession Management Platform ✅
+Rebuilt Retrocession on `src/retrocession/` engines: typed programmes with layers
+and placements, automatic recovery calculation from live claims, retro claims
+lifecycle (notify/approve/settle/dispute), counterparty security dashboard with
+concentration flags, validation engine, executive analytics/reports, and full
+accounting-journal integration. Removed the last illustrative in-component retro
+data ([TECH_DEBT.md](./TECH_DEBT.md) item 12 resolved).
+
+### Stage 4 — Enterprise Accounting & Financial Management Platform ✅
+Rebuilt Accounting on `src/accounting/`: reinsurance chart of accounts, derived
+double-entry general ledger, receivables aging, payables schedule, cash book and
+bank reconciliation, multi-currency FX, trial balances, draft financial
+statements, audit trail, and store-backed investments.
+
 ### Stage 3 — Enterprise IFRS 17 Reporting Engine ✅
 Rebuilt IFRS 17 reporting on `src/ifrs17/*`: PAA/GMM measurement models, LRC/LIC
 roll-forwards, fulfilment cash flows, configurable risk adjustment, reinsurance

@@ -12,6 +12,17 @@ None of these block current functionality; they matter for productionisation.
 | 3 | **No server persistence / period close** | IFRS 17 opening balances are always zero; roll-forwards are inception-to-date | Real close needs a backend |
 | 4 | **Single-browser data** | Clearing storage wipes everything | `resetData()` restores seed only |
 
+## Stage 4/5 additions
+
+| # | Item | Where |
+|---|---|---|
+| 23 | FX rates are manually configured indicative defaults — no rates API | `accounting/currency.ts` |
+| 24 | Audit trail is client-side (localStorage) and erasable — not tamper-proof | `DataStore.tsx` |
+| 25 | Retro recovery reserve = outstanding × (1 + IBNR/incurred ratio) — a proxy, not a per-layer actuarial projection | `retrocession/recoveryEngine.ts` |
+| 26 | Exposure uses premium + incurred claims as the gross-exposure proxy (no sum-insured data exists) | `retrocession/analytics.ts` |
+| 27 | PML = MPL × 0.65 fixed factor — placeholder until modelled | `retrocession/analytics.ts` |
+| 28 | Legacy `treaty.retroPercentage` still drives IFRS 17 Reinsurance Held; programme-based cession supersedes it only in accounting journals | `ifrs17/financialStatements.ts`, `accounting/journals.ts` |
+
 ## Calculation simplifications (intentional, documented)
 
 | # | Item | Where |
@@ -31,9 +42,9 @@ keep that transparency when extending them.
 
 | # | Item | Where |
 |---|---|---|
-| 12 | Retrocession program structure & treaty allocations use illustrative in-component data, not the store | `RetrocessionModule.tsx` |
+| 12 | ~~Retrocession illustrative in-component data~~ **Resolved in Stage 5** — programmes, placements, retro claims, and counterparties are store-backed | `RetrocessionModule.tsx` |
 | 13 | Pricing metrics (technical/commercial rate, risk factors) are illustrative; only the layer maths is live | `PricingSystem.tsx` |
-| 14 | Investments list is local component state, not in `DataStore` | `AccountingModule.tsx` |
+| 14 | ~~Investments in local component state~~ **Resolved in Stage 4** — store-backed with bank funding and journals | `AccountingModule.tsx` |
 | 15 | `layerDistribution` on claims is richer than the `LayerAllocation` interface; consumers read fields defensively | `DataStore.tsx`, `ClaimsModuleLinked.tsx`, `lib/actuarial.ts` |
 
 ## Front-end quality

@@ -63,6 +63,7 @@ const StatementTable = ({ title, lines, description }: { title: string; lines: S
 const AccountingModule = () => {
   const {
     treaties, claims, investments, bankAccounts, manualJournals, auditLog,
+    retroProgrammes, retroClaims,
     updateClaim, addPremiumBooking, addInvestment, updateInvestment,
     addBankAccount, addManualJournal, logAudit
   } = useDataStore();
@@ -88,8 +89,8 @@ const AccountingModule = () => {
 
   // ---- Accounting pipeline (all derived, recomputes on any store change) ----
   const journals = useMemo(
-    () => allJournals(treaties, claims, investments, manualJournals, totalIbnr),
-    [treaties, claims, investments, manualJournals, totalIbnr]
+    () => allJournals(treaties, claims, investments, manualJournals, totalIbnr, retroProgrammes, retroClaims),
+    [treaties, claims, investments, manualJournals, totalIbnr, retroProgrammes, retroClaims]
   );
   const ledger = useMemo(() => toLedger(journals, fxRates), [journals, fxRates]);
   const tbUnadjusted = useMemo(() => trialBalance(ledger, 'unadjusted', customAccounts), [ledger, customAccounts]);

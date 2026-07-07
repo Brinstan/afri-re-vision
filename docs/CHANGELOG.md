@@ -2,6 +2,36 @@
 
 All notable changes, by delivered stage. Commits are on `main`.
 
+## Stage 5 — Enterprise Retrocession Management Platform
+
+Rebuilt `RetrocessionModule.tsx` as an outward-reinsurance platform with engine
+logic under `src/retrocession/`.
+
+- **DataStore:** new persisted slices — `retroProgrammes` (typed programmes with
+  layers and placements), `retroClaims` (recovery lifecycle), `retrocessionaires`
+  (security panel) — all with audit logging.
+- **`src/retrocession/` engines:** `types.ts`, `recoveryEngine.ts` (per-claim
+  layer allocation, proportional & non-proportional, IBNR-loaded reserves),
+  `capacityEngine.ts` (attachment/exhaustion/width/utilization/aggregate
+  exposure), `counterpartyEngine.ts` (capacity used, exposure, recovery speed,
+  concentration), `validation.ts` (signed lines = 100%, overlaps/gaps,
+  duplicates, dates, recovery limits), `analytics.ts` (programme profitability,
+  portfolio protection, exposure by dimension, MPL/PML, recovery aging),
+  `reporting.ts` (5 CSV registers + executive/board print-to-PDF report).
+- **Accounting integration:** journal derivation extended — programme layer
+  premiums (Dr 5200 / Cr 2200), override commission (new account 4110), and
+  settled retro recoveries (Dr Bank / Cr 1200). Programme-based retro premium
+  supersedes the per-treaty retroPercentage journal when programmes exist.
+- **Actuarial integration:** recovery reserves loaded with the IBNR/incurred
+  ratio from the selected reserving method (reused, not recomputed).
+- **UI:** 7-tab workstation — Programmes (create/expire/mid-term adjust, layer
+  visuals), Placements (signed lines with over-placement guard), Recoveries
+  (auto-computed register with Notify action), Retro Claims (Notify → Approve →
+  Settle/Dispute lifecycle + aging), Counterparties (security dashboard with
+  concentration flags), Analytics (gross vs net, cost vs recoveries, exposure
+  distribution), Validation (live rule evaluation). Global filter bar.
+- **Docs:** CHANGELOG, ROADMAP, NEXT_STAGE, TECH_DEBT updated; DECISIONS.md added.
+
 ## Stage 3 — Enterprise IFRS 17 Reporting Engine (`64f6646`)
 
 Rebuilt `IfrsReporting.tsx` as a live IFRS 17 workstation with modular calculations
