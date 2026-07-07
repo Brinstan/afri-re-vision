@@ -17,7 +17,7 @@ export interface LayerAllocation {
   reinstatementPremium?: number;
 }
 
-interface Treaty {
+export interface Treaty {
   id: string;
   contractNumber: string;
   treatyName: string;
@@ -46,7 +46,7 @@ interface Treaty {
   premiumBookings?: PremiumBooking[];
 }
 
-interface Claim {
+export interface Claim {
   id: string;
   claimNumber: string;
   contractNumber: string;
@@ -63,6 +63,9 @@ interface Claim {
   retroRecovery?: number;
   reinstatementPremium?: number;
   layerDistribution?: LayerAllocation[];
+  paidAmount?: number;
+  paymentDate?: string;
+  paymentReference?: string;
 }
 
 interface UnderwritingContract {
