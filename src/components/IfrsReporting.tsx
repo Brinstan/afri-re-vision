@@ -1,750 +1,846 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/components/ui/sonner";
-import { FileText, Download, Eye, Calculator, TrendingUp, AlertCircle, Building, DollarSign, BarChart3, PieChart, FileSpreadsheet, Printer, RefreshCw } from "lucide-react";
+import { BookOpen, Download, FileSpreadsheet, FileText, Filter, RotateCcw, Scale, Shield, TrendingUp } from "lucide-react";
+import {
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer
+} from 'recharts';
 import { useDataStore } from './DataStore';
+import {
+  buildMethodInputs, runAllMethods, portfolioAnalytics, METHOD_LABELS, MethodKey,
+  DEFAULT_ASSUMPTIONS as ACTUARIAL_DEFAULTS, Assumptions as ActuarialAssumptions
+} from '@/lib/actuarial';
+import { Ifrs17Assumptions, Ifrs17Filters, ALL_FILTERS, MeasurementModel } from '@/ifrs17/types';
+import { loadAssumptions, saveAssumptions, measurementModel, earnedFraction } from '@/ifrs17/assumptions';
+import { riskAdjustmentMethodLabel } from '@/ifrs17/riskAdjustment';
+import { lrcRollForward, lrcTotals } from '@/ifrs17/lrc';
+import { licRollForward, licTotals, allocateIbnr } from '@/ifrs17/lic';
+import { fulfilmentCashFlows } from '@/ifrs17/fulfilmentCashFlows';
+import { reinsuranceIssued, reinsuranceHeld, financialStatements, portfolioPerformance } from '@/ifrs17/financialStatements';
+import { exportLrcCsv, exportLicCsv, exportAnalysisExcel, exportManagementReportPdf } from '@/ifrs17/reporting';
+
+const fmt = (n: number) => Math.round(n).toLocaleString();
+const fmtM = (n: number) => `${(n / 1_000_000).toFixed(2)}M`;
+
+const ACTUARIAL_KEY = 'afrirevision-actuarial-assumptions';
 
 const IfrsReporting = () => {
-  const [reportingPeriod, setReportingPeriod] = useState("2024-Q4");
-  const [reportType, setReportType] = useState("full");
-  const [generationProgress, setGenerationProgress] = useState(0);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [selectedContract, setSelectedContract] = useState(null);
-
   const { treaties, claims } = useDataStore();
 
-  // Auto-classify contracts based on treaty data
-  const classifyContracts = () => {
-    const paaContracts = treaties.filter(treaty => {
-      // PAA eligibility: coverage period <= 1 year and no significant variability
-      const inceptionDate = new Date(treaty.inceptionDate);
-      const expiryDate = new Date(treaty.expiryDate);
-      const coveragePeriod = (expiryDate.getTime() - inceptionDate.getTime()) / (1000 * 60 * 60 * 24 * 365);
-      return coveragePeriod <= 1.2; // Allow slight buffer for annual contracts
-    });
+  const [assumptions, setAssumptions] = useState<Ifrs17Assumptions>(loadAssumptions);
+  const [filters, setFilters] = useState<Ifrs17Filters>(ALL_FILTERS);
 
-    const gmmContracts = treaties.filter(treaty => {
-      const inceptionDate = new Date(treaty.inceptionDate);
-      const expiryDate = new Date(treaty.expiryDate);
-      const coveragePeriod = (expiryDate.getTime() - inceptionDate.getTime()) / (1000 * 60 * 60 * 24 * 365);
-      return coveragePeriod > 1.2;
-    });
+  useEffect(() => { saveAssumptions(assumptions); }, [assumptions]);
 
-    return { paaContracts, gmmContracts };
-  };
+  const setAssumption = <K extends keyof Ifrs17Assumptions>(key: K, value: Ifrs17Assumptions[K]) =>
+    setAssumptions(a => ({ ...a, [key]: value }));
+  const setFilter = <K extends keyof Ifrs17Filters>(key: K, value: string) =>
+    setFilters(f => ({ ...f, [key]: value }));
 
-  const { paaContracts, gmmContracts } = classifyContracts();
-
-  // Calculate IFRS 17 metrics from actual data
-  const calculateIFRS17Metrics = () => {
-    const totalPremium = treaties.reduce((sum, treaty) => sum + treaty.premium, 0);
-    const totalClaims = claims.reduce((sum, claim) => sum + claim.claimAmount, 0);
-    
-    // CSM calculation (simplified)
-    const csm = totalPremium * 0.15; // Assume 15% of premium as CSM
-    
-    // Risk adjustment calculation
-    const riskAdjustment = totalPremium * 0.08; // Assume 8% of premium as risk adjustment
-    
-    // LIC (Liability for Incurred Claims)
-    const lic = totalClaims * 1.1; // Include case reserves
-    
-    // LRC (Liability for Remaining Coverage)
-    const lrc = totalPremium * 0.6; // Unearned premium portion
-    
-    return {
-      csm,
-      riskAdjustment,
-      lic,
-      lrc,
-      totalPremium,
-      totalClaims
-    };
-  };
-
-  const ifrs17Metrics = calculateIFRS17Metrics();
-
-  const retrocessionProgram = [
-    { id: "RC-CAT-001", type: "Catastrophe XOL", layer: "250M xs 50M", premium: "12,500,000", attachment: 85, coverage: ["Motor", "Property", "Marine"] },
-    { id: "RC-QS-001", type: "Quota Share", layer: "25% of Portfolio", premium: "28,750,000", attachment: 0, coverage: ["All Lines"] },
-    { id: "RC-SL-001", type: "Stop Loss", layer: "90% xs 80%", premium: "8,200,000", attachment: 80, coverage: ["All Lines"] },
-    { id: "RC-WXL-001", type: "Working XOL", layer: "5M xs 2M", premium: "6,500,000", attachment: 75, coverage: ["Motor", "Liability"] }
-  ];
-
-  const generateReport = async (reportType) => {
-    setIsGenerating(true);
-    setGenerationProgress(0);
-    
+  // Actuarial assumptions (ELR, selected method) are reused from the Stage 2 workbench.
+  const actuarialAssumptions: ActuarialAssumptions = useMemo(() => {
     try {
-      // Simulate progressive report generation
-      const steps = [
-        "Collecting contract data...",
-        "Classifying contracts (PAA/GMM)...",
-        "Calculating CSM movements...",
-        "Computing risk adjustments...",
-        "Generating disclosure notes...",
-        "Finalizing IFRS 17 report..."
-      ];
+      const saved = localStorage.getItem(ACTUARIAL_KEY);
+      return saved ? { ...ACTUARIAL_DEFAULTS, ...JSON.parse(saved) } : ACTUARIAL_DEFAULTS;
+    } catch { return ACTUARIAL_DEFAULTS; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [treaties, claims]);
 
-      for (let i = 0; i < steps.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setGenerationProgress(((i + 1) / steps.length) * 100);
-        toast.info(steps[i]);
-      }
+  // ---- Filtering ----------------------------------------------------------
+  const filteredTreaties = useMemo(() => treaties.filter(t =>
+    (filters.cedant === 'all' || t.cedant === filters.cedant) &&
+    (filters.treatyId === 'all' || t.id === filters.treatyId) &&
+    (filters.broker === 'all' || t.broker === filters.broker) &&
+    (filters.country === 'all' || t.country === filters.country) &&
+    (filters.lineOfBusiness === 'all' || t.lineOfBusiness.includes(filters.lineOfBusiness)) &&
+    (filters.underwritingYear === 'all' || t.inceptionDate.startsWith(filters.underwritingYear))
+  ), [treaties, filters]);
 
-      // Generate actual report content
-      const reportData = {
-        title: getReportTitle(reportType),
-        period: reportingPeriod,
-        generatedAt: new Date().toISOString(),
-        contracts: {
-          paa: paaContracts.length,
-          gmm: gmmContracts.length,
-          total: treaties.length
-        },
-        metrics: ifrs17Metrics,
-        retrocession: retrocessionProgram
-      };
+  const filteredClaims = useMemo(() => {
+    const treatyIds = new Set(filteredTreaties.map(t => t.id));
+    return claims.filter(c =>
+      treatyIds.has(c.treatyId) &&
+      (filters.accidentYear === 'all' || c.dateOfLoss.startsWith(filters.accidentYear)) &&
+      new Date(c.dateOfLoss) <= new Date(assumptions.valuationDate)
+    );
+  }, [claims, filteredTreaties, filters.accidentYear, assumptions.valuationDate]);
 
-      // Create downloadable report
-      const reportContent = generateReportContent(reportData, reportType);
-      downloadReport(reportContent, reportData.title);
+  const filterOptions = useMemo(() => ({
+    cedants: Array.from(new Set(treaties.map(t => t.cedant))).sort(),
+    brokers: Array.from(new Set(treaties.map(t => t.broker))).sort(),
+    countries: Array.from(new Set(treaties.map(t => t.country))).sort(),
+    lobs: Array.from(new Set(treaties.flatMap(t => t.lineOfBusiness))).sort(),
+    accidentYears: Array.from(new Set(claims.map(c => c.dateOfLoss.slice(0, 4)))).sort(),
+    uwYears: Array.from(new Set(treaties.map(t => t.inceptionDate.slice(0, 4)))).sort()
+  }), [treaties, claims]);
 
-      toast.success(`${reportData.title} generated successfully!`);
-    } catch (error) {
-      toast.error("Failed to generate IFRS 17 report");
-    } finally {
-      setIsGenerating(false);
-      setGenerationProgress(0);
-    }
+  const activeFilterCount = Object.values(filters).filter(v => v !== 'all').length;
+
+  // ---- IBNR from the actuarial engine (reused, not duplicated) -------------
+  const { totalIbnr, actuarialMethodLabel } = useMemo(() => {
+    const inputs = buildMethodInputs(filteredClaims, filteredTreaties, actuarialAssumptions);
+    const methods = runAllMethods(inputs);
+    const key: MethodKey = actuarialAssumptions.selectedMethod ?? 'chainLadder';
+    const list = [methods.chainLadder, methods.bornhuetterFerguson, methods.capeCod, methods.expectedLossRatio];
+    const selected = list.find(m => m.method === key) ?? methods.chainLadder;
+    return { totalIbnr: selected.totals.ibnr, actuarialMethodLabel: METHOD_LABELS[selected.method] };
+  }, [filteredClaims, filteredTreaties, actuarialAssumptions]);
+
+  // ---- Core IFRS 17 computations -------------------------------------------
+  const ibnrAllocation = useMemo(() => allocateIbnr(filteredTreaties, filteredClaims, totalIbnr),
+    [filteredTreaties, filteredClaims, totalIbnr]);
+
+  const lrcRows = useMemo(() =>
+    filteredTreaties.map(t => lrcRollForward(t, filteredClaims, assumptions, actuarialAssumptions.expectedLossRatio)),
+    [filteredTreaties, filteredClaims, assumptions, actuarialAssumptions.expectedLossRatio]);
+  const lrcTotal = useMemo(() => lrcTotals(lrcRows), [lrcRows]);
+
+  const licRows = useMemo(() =>
+    filteredTreaties.map(t => licRollForward(t, filteredClaims, assumptions, ibnrAllocation[t.id] ?? 0)),
+    [filteredTreaties, filteredClaims, assumptions, ibnrAllocation]);
+  const licTotal = useMemo(() => licTotals(licRows), [licRows]);
+
+  const fcf = useMemo(() =>
+    fulfilmentCashFlows(filteredTreaties, filteredClaims, assumptions, actuarialAssumptions.expectedLossRatio, totalIbnr),
+    [filteredTreaties, filteredClaims, assumptions, actuarialAssumptions.expectedLossRatio, totalIbnr]);
+
+  const issued = useMemo(() => reinsuranceIssued(filteredTreaties, filteredClaims, assumptions), [filteredTreaties, filteredClaims, assumptions]);
+  const held = useMemo(() => reinsuranceHeld(filteredTreaties, filteredClaims, assumptions), [filteredTreaties, filteredClaims, assumptions]);
+  const statements = useMemo(() => financialStatements(issued, held, licTotal.closingBalance, licTotal.riskAdjustment, assumptions),
+    [issued, held, licTotal, assumptions]);
+
+  const treatyPerformance = useMemo(() => portfolioPerformance(filteredTreaties, filteredClaims, assumptions, 'treaty'), [filteredTreaties, filteredClaims, assumptions]);
+  const cedantPerformance = useMemo(() => portfolioPerformance(filteredTreaties, filteredClaims, assumptions, 'cedant'), [filteredTreaties, filteredClaims, assumptions]);
+  const analytics = useMemo(() => portfolioAnalytics(filteredTreaties, filteredClaims), [filteredTreaties, filteredClaims]);
+
+  // Premium receivables roll-forward source
+  const receivables = useMemo(() => filteredTreaties.map(t => {
+    const booked = (t.premiumBookings ?? []).reduce((s, b) => s + b.amount, 0);
+    const paid = (t.premiumBookings ?? []).reduce((s, b) => s + (b.paidAmount ?? 0), 0);
+    return { treatyName: t.treatyName, booked, paid, outstanding: booked - paid };
+  }), [filteredTreaties]);
+
+  const scopeDescription = activeFilterCount === 0
+    ? 'Full portfolio'
+    : Object.entries(filters).filter(([, v]) => v !== 'all')
+        .map(([k, v]) => `${k}=${k === 'treatyId' ? (treaties.find(t => t.id === v)?.treatyName ?? v) : v}`).join(', ');
+
+  const handleExportPdf = () => {
+    const ok = exportManagementReportPdf({
+      assumptions, statements, fcf, issued, held,
+      lrcTotal, licTotal, scopeDescription, actuarialMethodLabel
+    });
+    if (ok) toast.success("Management report opened — use the print dialog to save as PDF");
+    else toast.error("Pop-up blocked — allow pop-ups to export the PDF report");
   };
 
-  const getReportTitle = (type) => {
-    const titles = {
-      'ifrs17-full': 'Complete IFRS 17 Report',
-      'paa-analysis': 'PAA Contract Analysis',
-      'gmm-analysis': 'GMM Contract Analysis',
-      'csm-movements': 'CSM Movement Analysis',
-      'risk-adjustment': 'Risk Adjustment Report',
-      'disclosure-notes': 'IFRS 17 Disclosure Notes',
-      'reconciliation': 'IFRS 17 Reconciliation'
-    };
-    return titles[type] || 'IFRS 17 Report';
-  };
-
-  const generateReportContent = (data, type) => {
-    return `
-${data.title}
-${'='.repeat(data.title.length)}
-
-Reporting Period: ${data.period}
-Generated: ${new Date(data.generatedAt).toLocaleString()}
-
-EXECUTIVE SUMMARY
-================
-Total Contracts: ${data.contracts.total}
-- PAA Contracts: ${data.contracts.paa}
-- GMM Contracts: ${data.contracts.gmm}
-
-KEY METRICS (USD)
-================
-Contractual Service Margin: ${(data.metrics.csm / 1000000).toFixed(1)}M
-Risk Adjustment: ${(data.metrics.riskAdjustment / 1000000).toFixed(1)}M
-Liability for Incurred Claims: ${(data.metrics.lic / 1000000).toFixed(1)}M
-Liability for Remaining Coverage: ${(data.metrics.lrc / 1000000).toFixed(1)}M
-
-PREMIUM ALLOCATION APPROACH (PAA)
-=================================
-Eligible Contracts: ${data.contracts.paa}
-Total Premium: ${(data.metrics.totalPremium / 1000000).toFixed(1)}M
-Unearned Premium: ${(data.metrics.lrc / 1000000).toFixed(1)}M
-Loss Component: 0.0M
-
-GENERAL MEASUREMENT MODEL (GMM)
-===============================
-Complex Contracts: ${data.contracts.gmm}
-CSM Balance: ${(data.metrics.csm / 1000000).toFixed(1)}M
-Risk Adjustment: ${(data.metrics.riskAdjustment / 1000000).toFixed(1)}M
-Fulfillment Cash Flows: ${((data.metrics.lic + data.metrics.lrc) / 1000000).toFixed(1)}M
-
-RETROCESSION IMPACT
-==================
-${data.retrocession.map(retro => 
-  `${retro.type}: ${retro.layer} - Premium: USD ${parseInt(retro.premium).toLocaleString()}`
-).join('\n')}
-
-COMPLIANCE STATUS
-================
-✓ Contract identification completed
-✓ Measurement model selection validated
-✓ Discount rates determined
-✓ Risk adjustment calculated
-✓ Transition requirements met
-
-This report has been automatically generated from integrated system data.
-All calculations comply with IFRS 17 standards and regulatory requirements.
-    `;
-  };
-
-  const downloadReport = (content, title) => {
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${title.replace(/\s+/g, '_')}_${reportingPeriod}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const refreshData = () => {
-    toast.info("Refreshing IFRS 17 data from all modules...");
-    // Simulate data refresh
-    setTimeout(() => {
-      toast.success("IFRS 17 data refreshed successfully");
-    }, 1500);
-  };
+  const modelBadge = (model: MeasurementModel) => (
+    <Badge variant={model === 'PAA' ? 'secondary' : model === 'GMM' ? 'default' : 'outline'}>{model}</Badge>
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">IFRS 17 Reporting</h2>
-          <p className="text-gray-600">Comprehensive IFRS 17 compliance reporting with full system integration</p>
+          <h2 className="text-2xl font-bold text-gray-900">IFRS 17 Reporting Workstation</h2>
+          <p className="text-gray-600">
+            Live measurement from {filteredTreaties.length} treaties and {filteredClaims.length} claims · IBNR from {actuarialMethodLabel}
+          </p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={refreshData}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh Data
+          <Button variant="outline" onClick={() => {
+            exportAnalysisExcel(lrcRows, licRows, treatyPerformance, statements);
+            toast.success("Excel analysis exported");
+          }}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Excel Analysis
           </Button>
-          <Button onClick={() => generateReport('ifrs17-full')} disabled={isGenerating}>
+          <Button onClick={handleExportPdf}>
             <FileText className="h-4 w-4 mr-2" />
-            {isGenerating ? 'Generating...' : 'Generate IFRS 17 Report'}
+            Management Report (PDF)
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">PAA Contracts</CardTitle>
-            <Calculator className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{paaContracts.length}</div>
-            <p className="text-xs text-muted-foreground">Premium Allocation Approach</p>
-          </CardContent>
-        </Card>
+      {/* Filter bar */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium flex items-center">
+              <Filter className="h-4 w-4 mr-2" />
+              Reporting Scope {activeFilterCount > 0 && <Badge className="ml-2" variant="secondary">{activeFilterCount} active</Badge>}
+            </CardTitle>
+            {activeFilterCount > 0 && (
+              <Button size="sm" variant="ghost" onClick={() => setFilters(ALL_FILTERS)}>
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Clear
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Valuation Date</Label>
+              <Input type="date" value={assumptions.valuationDate} onChange={(e) => setAssumption('valuationDate', e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Currency</Label>
+              <Select value={assumptions.reportingCurrency} onValueChange={(v) => setAssumption('reportingCurrency', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['USD', 'TZS', 'EUR', 'GBP'].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {([
+              ['cedant', 'Cedant', filterOptions.cedants],
+              ['broker', 'Broker', filterOptions.brokers],
+              ['country', 'Country', filterOptions.countries],
+              ['lineOfBusiness', 'Line of Business', filterOptions.lobs],
+              ['accidentYear', 'Accident Year', filterOptions.accidentYears],
+              ['underwritingYear', 'UW Year', filterOptions.uwYears]
+            ] as Array<[keyof Ifrs17Filters, string, string[]]>).map(([key, label, opts]) => (
+              <div key={key} className="space-y-1">
+                <Label className="text-xs">{label}</Label>
+                <Select value={filters[key]} onValueChange={(v) => setFilter(key, v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    {opts.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3">
+            <Label className="text-xs">Treaty</Label>
+            <Select value={filters.treatyId} onValueChange={(v) => setFilter('treatyId', v)}>
+              <SelectTrigger className="max-w-md"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All treaties</SelectItem>
+                {treaties.map(t => <SelectItem key={t.id} value={t.id}>{t.treatyName} ({t.contractNumber})</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">GMM Contracts</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{gmmContracts.length}</div>
-            <p className="text-xs text-muted-foreground">General Measurement Model</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Retro Coverage</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{retrocessionProgram.length}</div>
-            <p className="text-xs text-muted-foreground">Active retrocession covers</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total CSM</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${(ifrs17Metrics.csm / 1000000).toFixed(1)}M</div>
-            <p className="text-xs text-muted-foreground">Contractual Service Margin</p>
-          </CardContent>
-        </Card>
+      {/* Headline balances */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'LRC Closing', value: lrcTotal.closingBalance, sub: `CSM ${fmtM(lrcTotal.csm)} · Loss comp. ${fmtM(lrcTotal.lossComponent)}`, icon: <Scale className="h-4 w-4" /> },
+          { label: 'LIC Closing', value: licTotal.closingBalance, sub: `IBNR ${fmtM(licTotal.ibnrMovement)} · RA ${fmtM(licTotal.riskAdjustment)}`, icon: <Shield className="h-4 w-4" /> },
+          { label: 'Insurance Revenue', value: statements.insuranceRevenue, sub: `Written ${fmtM(issued.premium)}`, icon: <TrendingUp className="h-4 w-4" /> },
+          { label: 'Technical Result', value: statements.technicalResult, sub: `Service result ${fmtM(statements.insuranceServiceResult)}`, icon: <BookOpen className="h-4 w-4" /> }
+        ].map(kpi => (
+          <Card key={kpi.label}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{kpi.label}</CardTitle>
+              {kpi.icon}
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${kpi.label === 'Technical Result' && kpi.value < 0 ? 'text-red-600' : ''}`}>
+                {assumptions.reportingCurrency} {fmtM(kpi.value)}
+              </div>
+              <p className="text-xs text-muted-foreground">{kpi.sub}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {isGenerating && (
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="p-6">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-blue-900">Generating IFRS 17 Report</span>
-                <span className="text-sm text-blue-700">{generationProgress.toFixed(0)}%</span>
-              </div>
-              <Progress value={generationProgress} className="w-full" />
-              <p className="text-sm text-blue-700">Processing integrated data from all modules...</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Tabs defaultValue="configuration" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="configuration">Report Configuration</TabsTrigger>
-          <TabsTrigger value="paa">PAA Analysis</TabsTrigger>
-          <TabsTrigger value="gmm">GMM Analysis</TabsTrigger>
-          <TabsTrigger value="retrocession">Retrocession Impact</TabsTrigger>
-          <TabsTrigger value="generation">Report Generation</TabsTrigger>
+      <Tabs defaultValue="statements" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="statements">Statements</TabsTrigger>
+          <TabsTrigger value="lrc">LRC</TabsTrigger>
+          <TabsTrigger value="lic">LIC & FCF</TabsTrigger>
+          <TabsTrigger value="reinsurance">Reinsurance</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="assumptions">Assumptions</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="configuration" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* ------------------------------------------------ Statements */}
+        <TabsContent value="statements" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Reporting Parameters</CardTitle>
+                <CardTitle>Statement of Insurance Service Result</CardTitle>
+                <CardDescription>Draft, derived from live data at {assumptions.valuationDate}</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Reporting Period</Label>
-                  <Select value={reportingPeriod} onValueChange={setReportingPeriod}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="2024-Q1">2024 Q1</SelectItem>
-                      <SelectItem value="2024-Q2">2024 Q2</SelectItem>
-                      <SelectItem value="2024-Q3">2024 Q3</SelectItem>
-                      <SelectItem value="2024-Q4">2024 Q4</SelectItem>
-                      <SelectItem value="2024-FY">2024 Full Year</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Report Type</Label>
-                  <Select value={reportType} onValueChange={setReportType}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="full">Full IFRS 17 Report</SelectItem>
-                      <SelectItem value="summary">Executive Summary</SelectItem>
-                      <SelectItem value="technical">Technical Analysis</SelectItem>
-                      <SelectItem value="regulatory">Regulatory Submission</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Output Format</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select format" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="word">Microsoft Word</SelectItem>
-                      <SelectItem value="pdf">PDF Document</SelectItem>
-                      <SelectItem value="excel">Excel Workbook</SelectItem>
-                      <SelectItem value="xml">XML (Regulatory)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <CardContent>
+                <Table>
+                  <TableBody>
+                    {([
+                      ['Insurance revenue', statements.insuranceRevenue, false],
+                      ['Insurance service expenses', -statements.insuranceServiceExpenses, false],
+                      ['Insurance service result', statements.insuranceServiceResult, true],
+                      ['Insurance finance income/(expense)', -statements.insuranceFinanceExpense, false],
+                      ['Net result from reinsurance held', statements.reinsuranceHeldResult, false],
+                      ['Technical result', statements.technicalResult, true]
+                    ] as Array<[string, number, boolean]>).map(([label, value, emphasis]) => (
+                      <TableRow key={label} className={emphasis ? 'font-bold border-t-2' : ''}>
+                        <TableCell>{label}</TableCell>
+                        <TableCell className={`text-right font-mono ${value < 0 ? 'text-red-600' : ''}`}>
+                          {value < 0 ? `(${fmt(Math.abs(value))})` : fmt(value)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Data Sources</CardTitle>
+                <CardTitle>Roll-Forward Summary</CardTitle>
+                <CardDescription>Movement in key balances (opening balances are zero in this prototype)</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Underwriting Data</span>
-                    <Badge variant="secondary">Connected</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Claims Data</span>
-                    <Badge variant="secondary">Connected</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Accounting Data</span>
-                    <Badge variant="secondary">Connected</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Retrocession Data</span>
-                    <Badge variant="secondary">Connected</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Market Data</span>
-                    <Badge variant="secondary">Connected</Badge>
-                  </div>
-                </div>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Balance</TableHead>
+                      <TableHead className="text-right">Opening</TableHead>
+                      <TableHead className="text-right">Movement</TableHead>
+                      <TableHead className="text-right">Closing</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {([
+                      ['LRC', 0, lrcTotal.closingBalance],
+                      ['LIC', 0, licTotal.closingBalance],
+                      ['IBNR', 0, licTotal.ibnrMovement],
+                      ['Outstanding claims (RBNS)', 0, licTotal.claimsIncurred - licTotal.claimsPaid],
+                      ['Premium receivables', 0, receivables.reduce((s, r) => s + r.outstanding, 0)]
+                    ] as Array<[string, number, number]>).map(([label, opening, closing]) => (
+                      <TableRow key={label}>
+                        <TableCell className="font-medium">{label}</TableCell>
+                        <TableCell className="text-right font-mono">{fmt(opening)}</TableCell>
+                        <TableCell className="text-right font-mono">{fmt(closing - opening)}</TableCell>
+                        <TableCell className="text-right font-mono">{fmt(closing)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Portfolio Performance</CardTitle>
+              <CardDescription>Insurance service result by treaty at the valuation date</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Treaty</TableHead>
+                    <TableHead className="text-right">Written Premium</TableHead>
+                    <TableHead className="text-right">Revenue</TableHead>
+                    <TableHead className="text-right">Claims Incurred</TableHead>
+                    <TableHead className="text-right">Expenses</TableHead>
+                    <TableHead className="text-right">Result</TableHead>
+                    <TableHead className="text-right">Loss Ratio</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {treatyPerformance.map(p => (
+                    <TableRow key={p.key}>
+                      <TableCell className="font-medium">{p.key}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(p.premium)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(p.revenue)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(p.claimsIncurred)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(p.expenses)}</TableCell>
+                      <TableCell className={`text-right font-mono ${p.result < 0 ? 'text-red-600' : 'text-green-600'}`}>{fmt(p.result)}</TableCell>
+                      <TableCell className="text-right font-mono">{p.lossRatio === null ? '—' : `${p.lossRatio.toFixed(1)}%`}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------ LRC */}
+        <TabsContent value="lrc" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Liability for Remaining Coverage</CardTitle>
+                <CardDescription>Roll-forward by treaty · PAA earns premium over coverage; GMM carries FCF + CSM</CardDescription>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => { exportLrcCsv(lrcRows); toast.success("LRC roll-forward exported"); }}>
+                <Download className="h-3 w-3 mr-1" />
+                CSV
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Treaty</TableHead>
+                    <TableHead>Model</TableHead>
+                    <TableHead className="text-right">Opening</TableHead>
+                    <TableHead className="text-right">Premium Received</TableHead>
+                    <TableHead className="text-right">Revenue Recognized</TableHead>
+                    <TableHead className="text-right">Acquisition CF</TableHead>
+                    <TableHead className="text-right">CSM</TableHead>
+                    <TableHead className="text-right">Loss Component</TableHead>
+                    <TableHead className="text-right">Closing</TableHead>
+                    <TableHead className="text-right">Earned</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {lrcRows.map(r => (
+                    <TableRow key={r.treatyId}>
+                      <TableCell className="font-medium">{r.treatyName}</TableCell>
+                      <TableCell>{modelBadge(r.model)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(r.openingBalance)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(r.premiumReceived)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(r.revenueRecognized)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(r.acquisitionCashFlows)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(r.csm)}</TableCell>
+                      <TableCell className={`text-right font-mono ${r.lossComponent > 0 ? 'text-red-600' : ''}`}>{fmt(r.lossComponent)}</TableCell>
+                      <TableCell className="text-right font-mono font-medium">{fmt(r.closingBalance)}</TableCell>
+                      <TableCell className="text-right">{(r.earnedFraction * 100).toFixed(0)}%</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="font-bold border-t-2">
+                    <TableCell colSpan={2}>Total</TableCell>
+                    <TableCell className="text-right font-mono">{fmt(lrcTotal.openingBalance)}</TableCell>
+                    <TableCell className="text-right font-mono">{fmt(lrcTotal.premiumReceived)}</TableCell>
+                    <TableCell className="text-right font-mono">{fmt(lrcTotal.revenueRecognized)}</TableCell>
+                    <TableCell className="text-right font-mono">{fmt(lrcTotal.acquisitionCashFlows)}</TableCell>
+                    <TableCell className="text-right font-mono">{fmt(lrcTotal.csm)}</TableCell>
+                    <TableCell className="text-right font-mono">{fmt(lrcTotal.lossComponent)}</TableCell>
+                    <TableCell className="text-right font-mono">{fmt(lrcTotal.closingBalance)}</TableCell>
+                    <TableCell />
+                  </TableRow>
+                </TableBody>
+              </Table>
+              {lrcRows.length === 0 && <p className="text-center text-muted-foreground py-6">No treaties in the current scope.</p>}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------ LIC & FCF */}
+        <TabsContent value="lic" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Liability for Incurred Claims</CardTitle>
+                <CardDescription>Case reserves + IBNR ({actuarialMethodLabel}) + risk adjustment ({riskAdjustmentMethodLabel(assumptions)})</CardDescription>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => { exportLicCsv(licRows); toast.success("LIC roll-forward exported"); }}>
+                <Download className="h-3 w-3 mr-1" />
+                CSV
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Treaty</TableHead>
+                    <TableHead className="text-right">Opening</TableHead>
+                    <TableHead className="text-right">Claims Incurred</TableHead>
+                    <TableHead className="text-right">Claims Paid</TableHead>
+                    <TableHead className="text-right">IBNR</TableHead>
+                    <TableHead className="text-right">Risk Adjustment</TableHead>
+                    <TableHead className="text-right">Closing</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {licRows.map(r => (
+                    <TableRow key={r.treatyId}>
+                      <TableCell className="font-medium">{r.treatyName}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(r.openingBalance)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(r.claimsIncurred)}</TableCell>
+                      <TableCell className="text-right font-mono">({fmt(r.claimsPaid)})</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(r.ibnrMovement)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(r.riskAdjustment)}</TableCell>
+                      <TableCell className="text-right font-mono font-medium">{fmt(r.closingBalance)}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="font-bold border-t-2">
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-right font-mono">{fmt(licTotal.openingBalance)}</TableCell>
+                    <TableCell className="text-right font-mono">{fmt(licTotal.claimsIncurred)}</TableCell>
+                    <TableCell className="text-right font-mono">({fmt(licTotal.claimsPaid)})</TableCell>
+                    <TableCell className="text-right font-mono">{fmt(licTotal.ibnrMovement)}</TableCell>
+                    <TableCell className="text-right font-mono">{fmt(licTotal.riskAdjustment)}</TableCell>
+                    <TableCell className="text-right font-mono">{fmt(licTotal.closingBalance)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Fulfilment Cash Flows</CardTitle>
+                <CardDescription>Discounted at {assumptions.discountRate}% p.a. (simplified one-year duration)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableBody>
+                    {([
+                      ['Expected claims (case + IBNR + unearned exposure)', fcf.expectedClaims],
+                      ['Expected attributable expenses', fcf.expectedExpenses],
+                      ['Reinsurance recoveries', -fcf.reinsuranceRecoveries],
+                      ['Effect of discounting', -fcf.discountEffect],
+                      ['Risk adjustment', fcf.riskAdjustment]
+                    ] as Array<[string, number]>).map(([label, value]) => (
+                      <TableRow key={label}>
+                        <TableCell>{label}</TableCell>
+                        <TableCell className={`text-right font-mono ${value < 0 ? 'text-green-600' : ''}`}>
+                          {value < 0 ? `(${fmt(Math.abs(value))})` : fmt(value)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold border-t-2">
+                      <TableCell>Total fulfilment cash flows</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(fcf.totalFcf)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Validation Status</CardTitle>
+                <CardTitle>Premium Receivables Roll-Forward</CardTitle>
+                <CardDescription>Booked vs settled premium by treaty</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Data Completeness</span>
-                    <Badge className="bg-green-100 text-green-800">98.5%</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Cohort Classification</span>
-                    <Badge className="bg-green-100 text-green-800">Valid</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">CSM Calculation</span>
-                    <Badge className="bg-green-100 text-green-800">Valid</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Risk Adjustment</span>
-                    <Badge className="bg-green-100 text-green-800">Valid</Badge>
-                  </div>
-                </div>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Treaty</TableHead>
+                      <TableHead className="text-right">Booked</TableHead>
+                      <TableHead className="text-right">Settled</TableHead>
+                      <TableHead className="text-right">Outstanding</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {receivables.map(r => (
+                      <TableRow key={r.treatyName}>
+                        <TableCell className="font-medium">{r.treatyName}</TableCell>
+                        <TableCell className="text-right font-mono">{fmt(r.booked)}</TableCell>
+                        <TableCell className="text-right font-mono">{fmt(r.paid)}</TableCell>
+                        <TableCell className={`text-right font-mono ${r.outstanding > 0 ? 'text-red-600' : ''}`}>{fmt(r.outstanding)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="paa" className="space-y-4">
+        {/* ------------------------------------------------ Reinsurance */}
+        <TabsContent value="reinsurance" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Reinsurance Issued (Inward)</CardTitle>
+                <CardDescription>The reinsurance business AfriRe writes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableBody>
+                    {([
+                      ['Written premium', issued.premium],
+                      ['Premium received', issued.premiumReceived],
+                      ['Insurance revenue (earned)', issued.revenue],
+                      ['Claims incurred', issued.claimsIncurred],
+                      ['Claims paid', issued.claimsPaid],
+                      ['Expenses (commission + attributable)', issued.expenses],
+                      ['Insurance service result', issued.serviceResult]
+                    ] as Array<[string, number]>).map(([label, value], i, arr) => (
+                      <TableRow key={label} className={i === arr.length - 1 ? 'font-bold border-t-2' : ''}>
+                        <TableCell>{label}</TableCell>
+                        <TableCell className={`text-right font-mono ${value < 0 ? 'text-red-600' : ''}`}>{fmt(value)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Reinsurance Held (Retrocession)</CardTitle>
+                <CardDescription>Protection AfriRe buys, from treaty retro percentages and recorded recoveries</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableBody>
+                    {([
+                      ['Ceded (retro) premium — earned share', held.cededPremium],
+                      ['Retro recoveries on claims', held.recoveries],
+                      ['Net cost of reinsurance held', held.netRetroCost]
+                    ] as Array<[string, number]>).map(([label, value], i, arr) => (
+                      <TableRow key={label} className={i === arr.length - 1 ? 'font-bold border-t-2' : ''}>
+                        <TableCell>{label}</TableCell>
+                        <TableCell className="text-right font-mono">{fmt(value)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <p className="text-xs text-muted-foreground mt-4">
+                  Retro recoveries flow from claims recorded in the Claims module; ceded premium applies each treaty's
+                  retrocession percentage to earned premium at the valuation date.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ------------------------------------------------ Analytics */}
+        <TabsContent value="analytics" className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {([
+              ['Loss Ratio', analytics.lossRatio === null ? '—' : `${analytics.lossRatio.toFixed(1)}%`],
+              ['Combined Ratio', analytics.combinedRatio === null ? '—' : `${analytics.combinedRatio.toFixed(1)}%`],
+              ['Claim Frequency', analytics.claimFrequency === null ? '—' : `${analytics.claimFrequency.toFixed(2)} / treaty`],
+              ['Claim Severity', analytics.claimSeverity === null ? '—' : `${assumptions.reportingCurrency} ${fmtM(analytics.claimSeverity)}`]
+            ] as Array<[string, string]>).map(([label, value]) => (
+              <Card key={label}>
+                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{label}</CardTitle></CardHeader>
+                <CardContent><div className="text-xl font-bold">{value}</div></CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle>Premium & Claims Trend</CardTitle></CardHeader>
+              <CardContent>
+                {analytics.premiumTrend.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-6">No data in scope.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={analytics.premiumTrend.map(p => ({
+                      year: String(p.year), Premium: p.premium, Claims: p.incurred
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="year" />
+                      <YAxis tickFormatter={(v) => `${(v / 1_000_000).toFixed(0)}M`} />
+                      <ChartTooltip formatter={(v: number) => fmt(v)} />
+                      <Legend />
+                      <Bar dataKey="Premium" fill="#2563eb" />
+                      <Bar dataKey="Claims" fill="#dc2626" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>Loss Ratio Trend</CardTitle></CardHeader>
+              <CardContent>
+                {analytics.premiumTrend.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-6">No data in scope.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart data={analytics.premiumTrend.map(p => ({
+                      year: String(p.year), 'Loss Ratio %': p.lossRatio === null ? null : Number(p.lossRatio.toFixed(1))
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="year" />
+                      <YAxis tickFormatter={(v) => `${v}%`} />
+                      <ChartTooltip formatter={(v: number) => `${v}%`} />
+                      <Legend />
+                      <Line type="monotone" dataKey="Loss Ratio %" stroke="#dc2626" connectNulls />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>Premium Allocation Approach (PAA) Contracts</CardTitle>
-              <CardDescription>Short-duration contracts eligible for simplified measurement</CardDescription>
+              <CardTitle>Cedant Profitability</CardTitle>
+              <CardDescription>Insurance service result by cedant</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Contract ID</TableHead>
-                        <TableHead>Treaty Name</TableHead>
-                        <TableHead>Premium</TableHead>
-                        <TableHead>Coverage Period</TableHead>
-                        <TableHead>Liability Adequacy</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paaContracts.map((contract) => (
-                        <TableRow key={contract.id}>
-                          <TableCell className="font-medium">{contract.contractNumber}</TableCell>
-                          <TableCell>{contract.treatyName}</TableCell>
-                          <TableCell>USD {contract.premium.toLocaleString()}</TableCell>
-                          <TableCell>≤ 1 Year</TableCell>
-                          <TableCell>
-                            <Badge className="bg-green-100 text-green-800">Adequate</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{contract.status}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Button size="sm" variant="outline" onClick={() => generateReport('paa-analysis')}>
-                              <Eye className="h-3 w-3 mr-1" />
-                              Analyze
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <p className="text-sm font-medium text-blue-900">Total PAA Premium</p>
-                    <p className="text-2xl font-bold text-blue-900">
-                      USD {(paaContracts.reduce((sum, c) => sum + c.premium, 0) / 1000000).toFixed(1)}M
-                    </p>
-                  </div>
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <p className="text-sm font-medium text-green-900">Unearned Premium</p>
-                    <p className="text-2xl font-bold text-green-900">
-                      USD {(ifrs17Metrics.lrc / 1000000).toFixed(1)}M
-                    </p>
-                  </div>
-                  <div className="bg-orange-50 p-4 rounded-lg">
-                    <p className="text-sm font-medium text-orange-900">Loss Component</p>
-                    <p className="text-2xl font-bold text-orange-900">USD 0.00</p>
-                  </div>
-                </div>
-
-                <Button onClick={() => generateReport('paa-analysis')} disabled={isGenerating}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Generate PAA Report
-                </Button>
-              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cedant</TableHead>
+                    <TableHead className="text-right">Premium</TableHead>
+                    <TableHead className="text-right">Revenue</TableHead>
+                    <TableHead className="text-right">Claims</TableHead>
+                    <TableHead className="text-right">Result</TableHead>
+                    <TableHead className="text-right">Loss Ratio</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {cedantPerformance.map(p => (
+                    <TableRow key={p.key}>
+                      <TableCell className="font-medium">{p.key}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(p.premium)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(p.revenue)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(p.claimsIncurred)}</TableCell>
+                      <TableCell className={`text-right font-mono ${p.result < 0 ? 'text-red-600' : 'text-green-600'}`}>{fmt(p.result)}</TableCell>
+                      <TableCell className="text-right font-mono">{p.lossRatio === null ? '—' : `${p.lossRatio.toFixed(1)}%`}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="gmm" className="space-y-4">
+        {/* ------------------------------------------------ Assumptions */}
+        <TabsContent value="assumptions" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>User Assumptions</CardTitle>
+                <CardDescription>Set by the preparer — persisted across sessions</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Discount Rate (% p.a.)</Label>
+                    <Input type="number" step="0.1" value={assumptions.discountRate}
+                      onChange={(e) => setAssumption('discountRate', parseFloat(e.target.value) || 0)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Expense Ratio (% of premium)</Label>
+                    <Input type="number" step="0.1" value={assumptions.expenseRatio}
+                      onChange={(e) => setAssumption('expenseRatio', parseFloat(e.target.value) || 0)} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Risk Adjustment Method</Label>
+                  <Select value={assumptions.riskAdjustmentMethod}
+                    onValueChange={(v) => setAssumption('riskAdjustmentMethod', v as Ifrs17Assumptions['riskAdjustmentMethod'])}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percentOfReserves">Percentage of Reserves</SelectItem>
+                      <SelectItem value="confidenceLevel">Confidence Level</SelectItem>
+                      <SelectItem value="costOfCapital">Cost of Capital (placeholder)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {assumptions.riskAdjustmentMethod === 'percentOfReserves' && (
+                  <div className="space-y-2">
+                    <Label>Risk Adjustment (% of reserves)</Label>
+                    <Input type="number" step="0.5" value={assumptions.riskAdjustmentPercent}
+                      onChange={(e) => setAssumption('riskAdjustmentPercent', parseFloat(e.target.value) || 0)} />
+                  </div>
+                )}
+                {assumptions.riskAdjustmentMethod === 'confidenceLevel' && (
+                  <div className="space-y-2">
+                    <Label>Confidence Level</Label>
+                    <Select value={String(assumptions.confidenceLevel)}
+                      onValueChange={(v) => setAssumption('confidenceLevel', parseInt(v) as Ifrs17Assumptions['confidenceLevel'])}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {[65, 75, 85, 95].map(c => <SelectItem key={c} value={String(c)}>{c}%</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {assumptions.riskAdjustmentMethod === 'costOfCapital' && (
+                  <div className="space-y-2">
+                    <Label>Cost of Capital Rate (% p.a.)</Label>
+                    <Input type="number" step="0.5" value={assumptions.costOfCapitalRate}
+                      onChange={(e) => setAssumption('costOfCapitalRate', parseFloat(e.target.value) || 0)} />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Calculated / Inherited Values</CardTitle>
+                <CardDescription>Derived by the engine — not directly editable here</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableBody>
+                    {([
+                      ['Expected loss ratio', `${actuarialAssumptions.expectedLossRatio}% (from Actuarial Engine)`],
+                      ['Reserving method for IBNR', `${actuarialMethodLabel} (selected in Actuarial Engine)`],
+                      ['Claims inflation', `${actuarialAssumptions.claimsInflation}% p.a. (from Actuarial Engine)`],
+                      ['Total IBNR in scope', `${assumptions.reportingCurrency} ${fmt(totalIbnr)}`],
+                      ['Risk adjustment basis', riskAdjustmentMethodLabel(assumptions)],
+                      ['Reporting date', assumptions.valuationDate]
+                    ] as Array<[string, string]>).map(([label, value]) => (
+                      <TableRow key={label}>
+                        <TableCell className="text-muted-foreground">{label}</TableCell>
+                        <TableCell className="font-medium">{value}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>General Measurement Model (GMM) Contracts</CardTitle>
-              <CardDescription>Long-duration contracts requiring full IFRS 17 measurement</CardDescription>
+              <CardTitle>Measurement Model Assignment</CardTitle>
+              <CardDescription>PAA applies automatically to coverage ≤ 12 months; override per treaty (VFA is a placeholder)</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Contract ID</TableHead>
-                        <TableHead>Treaty Name</TableHead>
-                        <TableHead>Premium</TableHead>
-                        <TableHead>CSM</TableHead>
-                        <TableHead>Risk Adjustment</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Treaty</TableHead>
+                    <TableHead>Coverage Period</TableHead>
+                    <TableHead>Earned</TableHead>
+                    <TableHead>Model</TableHead>
+                    <TableHead>Override</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {treaties.map(t => {
+                    const model = measurementModel(t, assumptions);
+                    return (
+                      <TableRow key={t.id}>
+                        <TableCell className="font-medium">{t.treatyName}</TableCell>
+                        <TableCell>{t.inceptionDate} → {t.expiryDate}</TableCell>
+                        <TableCell>{(earnedFraction(t, assumptions.valuationDate) * 100).toFixed(0)}%</TableCell>
+                        <TableCell>{modelBadge(model)}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={assumptions.modelOverrides[t.id] ?? 'auto'}
+                            onValueChange={(v) => {
+                              const overrides = { ...assumptions.modelOverrides };
+                              if (v === 'auto') delete overrides[t.id];
+                              else overrides[t.id] = v as MeasurementModel;
+                              setAssumption('modelOverrides', overrides);
+                              toast.success(`${t.treatyName}: measurement model ${v === 'auto' ? 'reset to automatic' : `set to ${v}`}`);
+                            }}
+                          >
+                            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="auto">Automatic</SelectItem>
+                              <SelectItem value="PAA">PAA</SelectItem>
+                              <SelectItem value="GMM">GMM</SelectItem>
+                              <SelectItem value="VFA">VFA</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {gmmContracts.map((contract) => {
-                        const contractCSM = contract.premium * 0.15;
-                        const contractRA = contract.premium * 0.08;
-                        return (
-                          <TableRow key={contract.id}>
-                            <TableCell className="font-medium">{contract.contractNumber}</TableCell>
-                            <TableCell>{contract.treatyName}</TableCell>
-                            <TableCell>USD {contract.premium.toLocaleString()}</TableCell>
-                            <TableCell>USD {contractCSM.toLocaleString()}</TableCell>
-                            <TableCell>USD {contractRA.toLocaleString()}</TableCell>
-                            <TableCell>
-                              <Badge variant="secondary">{contract.status}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Button size="sm" variant="outline" onClick={() => generateReport('gmm-analysis')}>
-                                <Calculator className="h-3 w-3 mr-1" />
-                                Calculate
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-                  <div className="bg-purple-50 p-4 rounded-lg">
-                    <p className="text-sm font-medium text-purple-900">Total CSM</p>
-                    <p className="text-2xl font-bold text-purple-900">
-                      USD {(ifrs17Metrics.csm / 1000000).toFixed(1)}M
-                    </p>
-                  </div>
-                  <div className="bg-red-50 p-4 rounded-lg">
-                    <p className="text-sm font-medium text-red-900">Risk Adjustment</p>
-                    <p className="text-2xl font-bold text-red-900">
-                      USD {(ifrs17Metrics.riskAdjustment / 1000000).toFixed(1)}M
-                    </p>
-                  </div>
-                  <div className="bg-indigo-50 p-4 rounded-lg">
-                    <p className="text-sm font-medium text-indigo-900">Fulfillment CF</p>
-                    <p className="text-2xl font-bold text-indigo-900">
-                      USD {((ifrs17Metrics.lic + ifrs17Metrics.lrc) / 1000000).toFixed(1)}M
-                    </p>
-                  </div>
-                  <div className="bg-teal-50 p-4 rounded-lg">
-                    <p className="text-sm font-medium text-teal-900">BEL</p>
-                    <p className="text-2xl font-bold text-teal-900">
-                      USD {((ifrs17Metrics.lic + ifrs17Metrics.lrc - ifrs17Metrics.riskAdjustment) / 1000000).toFixed(1)}M
-                    </p>
-                  </div>
-                </div>
-
-                <Button onClick={() => generateReport('gmm-analysis')} disabled={isGenerating}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Generate GMM Report
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="retrocession" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Retrocession Program Impact</CardTitle>
-              <CardDescription>Automatic allocation of retrocession based on company's retro program</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Retro Cover ID</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Coverage</TableHead>
-                        <TableHead>Premium</TableHead>
-                        <TableHead>Auto Allocation</TableHead>
-                        <TableHead>IFRS 17 Impact</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {retrocessionProgram.map((retro) => (
-                        <TableRow key={retro.id}>
-                          <TableCell className="font-medium">{retro.id}</TableCell>
-                          <TableCell>{retro.type}</TableCell>
-                          <TableCell>{retro.layer}</TableCell>
-                          <TableCell>USD {parseInt(retro.premium).toLocaleString()}</TableCell>
-                          <TableCell>
-                            <Badge className="bg-green-100 text-green-800">Active</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">CSM Adjusted</Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium mb-3">Automatic Retrocession Allocation</h4>
-                  <div className="space-y-2 text-sm">
-                    <p>• All treaty business automatically allocated to retrocession covers based on program structure</p>
-                    <p>• Claims automatically trigger retrocession recoveries per treaty terms</p>
-                    <p>• Net retention calculated in real-time considering all retro layers</p>
-                    <p>• IFRS 17 measurement adjusted for retrocession impact on CSM and risk adjustment</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="generation" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>IFRS 17 Report Generation</CardTitle>
-              <CardDescription>Generate comprehensive reports with all IFRS 17 requirements</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <h4 className="font-medium">Report Sections</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span>Executive Summary</span>
-                      <Badge variant="outline">Included</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>PAA Analysis</span>
-                      <Badge variant="outline">Included</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>GMM Calculations</span>
-                      <Badge variant="outline">Included</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>CSM Movements</span>
-                      <Badge variant="outline">Included</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Risk Adjustment</span>
-                      <Badge variant="outline">Included</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Retrocession Impact</span>
-                      <Badge variant="outline">Included</Badge>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="font-medium">Compliance Checklist</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span>Contract Identification</span>
-                      <Badge className="bg-green-100 text-green-800">✓ Complete</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Measurement Model Selection</span>
-                      <Badge className="bg-green-100 text-green-800">✓ Complete</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Discount Rate Determination</span>
-                      <Badge className="bg-green-100 text-green-800">✓ Complete</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Risk Adjustment Calculation</span>
-                      <Badge className="bg-green-100 text-green-800">✓ Complete</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Transition Requirements</span>
-                      <Badge className="bg-green-100 text-green-800">✓ Complete</Badge>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Button 
-                  className="h-16 flex flex-col items-center justify-center" 
-                  onClick={() => generateReport('ifrs17-full')}
-                  disabled={isGenerating}
-                >
-                  <FileText className="h-6 w-6 mb-1" />
-                  <span>Full IFRS 17 Report</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="h-16 flex flex-col items-center justify-center"
-                  onClick={() => generateReport('csm-movements')}
-                  disabled={isGenerating}
-                >
-                  <TrendingUp className="h-6 w-6 mb-1" />
-                  <span>CSM Movements</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="h-16 flex flex-col items-center justify-center"
-                  onClick={() => generateReport('risk-adjustment')}
-                  disabled={isGenerating}
-                >
-                  <AlertCircle className="h-6 w-6 mb-1" />
-                  <span>Risk Adjustment</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="h-16 flex flex-col items-center justify-center"
-                  onClick={() => generateReport('disclosure-notes')}
-                  disabled={isGenerating}
-                >
-                  <FileSpreadsheet className="h-6 w-6 mb-1" />
-                  <span>Disclosure Notes</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="h-16 flex flex-col items-center justify-center"
-                  onClick={() => generateReport('reconciliation')}
-                  disabled={isGenerating}
-                >
-                  <Calculator className="h-6 w-6 mb-1" />
-                  <span>Reconciliation</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="h-16 flex flex-col items-center justify-center"
-                  onClick={() => generateReport('regulatory-submission')}
-                  disabled={isGenerating}
-                >
-                  <Building className="h-6 w-6 mb-1" />
-                  <span>Regulatory Submission</span>
-                </Button>
-              </div>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>

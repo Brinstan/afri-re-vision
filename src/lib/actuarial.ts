@@ -91,18 +91,18 @@ export const currentYear = () => new Date().getFullYear();
 export const inflate = (amount: number, originYear: number, ratePct: number): number =>
   amount * Math.pow(1 + ratePct / 100, Math.max(0, currentYear() - originYear));
 
-const claimPaid = (c: Claim): number => {
+export const claimPaid = (c: Claim): number => {
   if (typeof c.paidAmount === 'number' && c.paidAmount > 0) return c.paidAmount;
   const settled = ['Settled', 'Full Payment', 'Paid'].includes(c.status);
   return settled ? c.claimAmount : 0;
 };
 
-const claimCaseReserve = (c: Claim): number => {
+export const claimCaseReserve = (c: Claim): number => {
   const settled = ['Settled', 'Full Payment', 'Paid'].includes(c.status);
   return settled ? 0 : c.reserveAmount;
 };
 
-const claimIncurred = (c: Claim): number => claimPaid(c) + claimCaseReserve(c);
+export const claimIncurred = (c: Claim): number => claimPaid(c) + claimCaseReserve(c);
 
 export interface GroupOption { key: string; label: string }
 
