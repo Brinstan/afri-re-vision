@@ -92,11 +92,68 @@ interface UnderwritingContract {
   expiryDate: string;
 }
 
+export interface Investment {
+  id: string;
+  investmentEntity: string;
+  entityType: string;
+  investmentType: string;
+  investmentDate: string;
+  amount: number;
+  expectedReturnRate: number;
+  expectedReturnAmount: number;
+  maturityDate: string;
+  riskLevel: string;
+  description: string;
+  status: 'Active' | 'Matured' | 'Disposed';
+  actualReturns: number;
+  currency: string;
+  bankAccountId?: string;        // funding bank account
+}
+
+export interface BankAccount {
+  id: string;
+  name: string;
+  bank: string;
+  accountNumber: string;
+  currency: string;
+  openingBalance: number;
+}
+
+/** A manual double-entry journal captured by the finance user. */
+export interface ManualJournal {
+  id: string;
+  postingDate: string;
+  reference: string;
+  narration: string;
+  currency: string;
+  debitAccount: string;          // account code
+  creditAccount: string;         // account code
+  amount: number;
+  postedBy: string;
+  adjustment: boolean;           // included only in the adjusted trial balance
+}
+
+export interface AuditEntry {
+  id: string;
+  timestamp: string;
+  user: string;
+  action: string;                // 'CREATE' | 'UPDATE' | 'PAYMENT' | 'CONVERT' | 'RESET' | ...
+  entity: string;                // 'Treaty' | 'Claim' | 'Investment' | 'Journal' | ...
+  entityId: string;
+  sourceModule: string;
+  previousValue?: string;
+  newValue?: string;
+}
+
 interface DataStore {
   treaties: Treaty[];
   claims: Claim[];
   underwritingContracts: UnderwritingContract[];
-  
+  investments: Investment[];
+  bankAccounts: BankAccount[];
+  manualJournals: ManualJournal[];
+  auditLog: AuditEntry[];
+
   // Treaty actions
   addTreaty: (treaty: Treaty) => void;
   updateTreaty: (id: string, updates: Partial<Treaty>) => void;
@@ -116,11 +173,38 @@ interface DataStore {
   addPremiumBooking: (treatyId: string, booking: PremiumBooking) => void;
   updatePremiumPaymentStatus: (treatyId: string, bookingId: string, status: PremiumBooking['status'], paidAmount?: number) => void;
 
+  // Investment actions
+  addInvestment: (investment: Investment) => void;
+  updateInvestment: (id: string, updates: Partial<Investment>) => void;
+
+  // Bank account actions
+  addBankAccount: (account: BankAccount) => void;
+
+  // Manual journal actions
+  addManualJournal: (journal: ManualJournal) => void;
+
+  // Audit trail
+  logAudit: (entry: Omit<AuditEntry, 'id' | 'timestamp' | 'user'>) => void;
+
   // Utility actions
   resetData: () => void;
 }
 
-const initialData: Pick<DataStore, 'treaties' | 'claims' | 'underwritingContracts'> = {
+const currentUser = (): string => {
+  try {
+    const saved = localStorage.getItem('user');
+    return saved ? (JSON.parse(saved).username ?? 'system') : 'system';
+  } catch { return 'system'; }
+};
+
+const auditEntry = (entry: Omit<AuditEntry, 'id' | 'timestamp' | 'user'>): AuditEntry => ({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  timestamp: new Date().toISOString(),
+  user: currentUser(),
+  ...entry
+});
+
+const initialData: Pick<DataStore, 'treaties' | 'claims' | 'underwritingContracts' | 'investments' | 'bankAccounts' | 'manualJournals' | 'auditLog'> = {
   treaties: [
     {
       id: '1',
@@ -213,7 +297,52 @@ const initialData: Pick<DataStore, 'treaties' | 'claims' | 'underwritingContract
       inceptionDate: '2024-06-01',
       expiryDate: '2025-05-31'
     }
-  ]
+  ],
+
+  investments: [
+    {
+      id: 'inv1',
+      investmentEntity: 'Tanzania Government Bonds',
+      entityType: 'Government',
+      investmentType: 'Bonds',
+      investmentDate: '2024-01-15',
+      amount: 50000000,
+      expectedReturnRate: 8.5,
+      expectedReturnAmount: 4250000,
+      maturityDate: '2029-01-15',
+      riskLevel: 'Low',
+      description: '5-year Treasury Bonds',
+      status: 'Active',
+      actualReturns: 2125000,
+      currency: 'USD',
+      bankAccountId: 'bank1'
+    },
+    {
+      id: 'inv2',
+      investmentEntity: 'Vodacom Tanzania PLC',
+      entityType: 'Corporation',
+      investmentType: 'Stocks',
+      investmentDate: '2024-03-10',
+      amount: 25000000,
+      expectedReturnRate: 12.0,
+      expectedReturnAmount: 3000000,
+      maturityDate: '2025-03-10',
+      riskLevel: 'Medium',
+      description: 'Equity investment in telecommunications',
+      status: 'Active',
+      actualReturns: 1800000,
+      currency: 'USD',
+      bankAccountId: 'bank1'
+    }
+  ],
+
+  bankAccounts: [
+    { id: 'bank1', name: 'Main Operating Account', bank: 'CRDB Bank PLC', accountNumber: '0150-XXXX-4401', currency: 'USD', openingBalance: 120000000 },
+    { id: 'bank2', name: 'Local Settlements Account', bank: 'NMB Bank PLC', accountNumber: '2041-XXXX-8817', currency: 'TZS', openingBalance: 8500000000 }
+  ],
+
+  manualJournals: [],
+  auditLog: []
 };
 
 export const useDataStore = create<DataStore>()(persist((set, get) => ({
@@ -221,14 +350,22 @@ export const useDataStore = create<DataStore>()(persist((set, get) => ({
 
   // Treaty actions
   addTreaty: (treaty) => set((state) => ({
-    treaties: [...state.treaties, treaty]
+    treaties: [...state.treaties, treaty],
+    auditLog: [...state.auditLog, auditEntry({ action: 'CREATE', entity: 'Treaty', entityId: treaty.contractNumber, sourceModule: 'Treaty Management', newValue: treaty.treatyName })]
   })),
-  
-  updateTreaty: (id, updates) => set((state) => ({
-    treaties: state.treaties.map(treaty => 
-      treaty.id === id ? { ...treaty, ...updates } : treaty
-    )
-  })),
+
+  updateTreaty: (id, updates) => set((state) => {
+    const prev = state.treaties.find(t => t.id === id);
+    return {
+      treaties: state.treaties.map(treaty =>
+        treaty.id === id ? { ...treaty, ...updates } : treaty
+      ),
+      auditLog: [...state.auditLog, auditEntry({
+        action: 'UPDATE', entity: 'Treaty', entityId: prev?.contractNumber ?? id,
+        sourceModule: 'Treaty Management', newValue: Object.keys(updates).join(', ')
+      })]
+    };
+  }),
   
   getTreatyByContractNumber: (contractNumber) => {
     const state = get();
@@ -237,14 +374,24 @@ export const useDataStore = create<DataStore>()(persist((set, get) => ({
 
   // Claims actions
   addClaim: (claim) => set((state) => ({
-    claims: [...state.claims, claim]
+    claims: [...state.claims, claim],
+    auditLog: [...state.auditLog, auditEntry({ action: 'CREATE', entity: 'Claim', entityId: claim.claimNumber, sourceModule: 'Claims', newValue: `${claim.currency} ${claim.claimAmount.toLocaleString()}` })]
   })),
-  
-  updateClaim: (id, updates) => set((state) => ({
-    claims: state.claims.map(claim => 
-      claim.id === id ? { ...claim, ...updates } : claim
-    )
-  })),
+
+  updateClaim: (id, updates) => set((state) => {
+    const prev = state.claims.find(c => c.id === id);
+    return {
+      claims: state.claims.map(claim =>
+        claim.id === id ? { ...claim, ...updates } : claim
+      ),
+      auditLog: [...state.auditLog, auditEntry({
+        action: updates.paidAmount !== undefined ? 'PAYMENT' : 'UPDATE',
+        entity: 'Claim', entityId: prev?.claimNumber ?? id, sourceModule: 'Claims/Accounting',
+        previousValue: prev ? prev.status : undefined,
+        newValue: updates.status ?? Object.keys(updates).join(', ')
+      })]
+    };
+  }),
   
   getClaimsByTreaty: (treatyId) => {
     const state = get();
@@ -287,24 +434,33 @@ export const useDataStore = create<DataStore>()(persist((set, get) => ({
       
       set((state) => ({
         treaties: [...state.treaties, newTreaty],
-        underwritingContracts: state.underwritingContracts.map(c => 
+        underwritingContracts: state.underwritingContracts.map(c =>
           c.id === contractId ? { ...c, status: 'Active' as const } : c
-        )
+        ),
+        auditLog: [...state.auditLog, auditEntry({
+          action: 'CONVERT', entity: 'Treaty', entityId: contract.contractNumber,
+          sourceModule: 'Underwriting', previousValue: 'Draft contract', newValue: `Active treaty ${contract.treatyName}`
+        })]
       }));
     }
   },
 
   // Premium booking actions
-  addPremiumBooking: (treatyId, booking) => set((state) => ({
-    treaties: state.treaties.map(treaty => 
-      treaty.id === treatyId 
-        ? { 
-            ...treaty, 
-            premiumBookings: [...(treaty.premiumBookings || []), booking] 
-          }
-        : treaty
-    )
-  })),
+  addPremiumBooking: (treatyId, booking) => set((state) => {
+    const treaty = state.treaties.find(t => t.id === treatyId);
+    return {
+      treaties: state.treaties.map(t =>
+        t.id === treatyId
+          ? { ...t, premiumBookings: [...(t.premiumBookings || []), booking] }
+          : t
+      ),
+      auditLog: [...state.auditLog, auditEntry({
+        action: 'CREATE', entity: 'PremiumBooking', entityId: booking.id,
+        sourceModule: 'Treaty Management',
+        newValue: `${booking.type} ${booking.amount.toLocaleString()} on ${treaty?.treatyName ?? treatyId}`
+      })]
+    };
+  }),
   
   updatePremiumPaymentStatus: (treatyId, bookingId, status, paidAmount) => set((state) => ({
     treaties: state.treaties.map(treaty =>
@@ -321,5 +477,54 @@ export const useDataStore = create<DataStore>()(persist((set, get) => ({
     )
   })),
 
-  resetData: () => set(() => ({ ...initialData }))
+  // Investment actions
+  addInvestment: (investment) => set((state) => ({
+    investments: [...state.investments, investment],
+    auditLog: [...state.auditLog, auditEntry({
+      action: 'CREATE', entity: 'Investment', entityId: investment.id,
+      sourceModule: 'Accounting', newValue: `${investment.investmentEntity} ${investment.currency} ${investment.amount.toLocaleString()}`
+    })]
+  })),
+
+  updateInvestment: (id, updates) => set((state) => {
+    const prev = state.investments.find(i => i.id === id);
+    return {
+      investments: state.investments.map(inv =>
+        inv.id === id ? { ...inv, ...updates } : inv
+      ),
+      auditLog: [...state.auditLog, auditEntry({
+        action: 'UPDATE', entity: 'Investment', entityId: id, sourceModule: 'Accounting',
+        previousValue: prev ? `${prev.status}, returns ${prev.actualReturns.toLocaleString()}` : undefined,
+        newValue: Object.entries(updates).map(([k, v]) => `${k}=${v}`).join(', ')
+      })]
+    };
+  }),
+
+  // Bank account actions
+  addBankAccount: (account) => set((state) => ({
+    bankAccounts: [...state.bankAccounts, account],
+    auditLog: [...state.auditLog, auditEntry({
+      action: 'CREATE', entity: 'BankAccount', entityId: account.id,
+      sourceModule: 'Accounting', newValue: `${account.name} (${account.bank}, ${account.currency})`
+    })]
+  })),
+
+  // Manual journal actions
+  addManualJournal: (journal) => set((state) => ({
+    manualJournals: [...state.manualJournals, journal],
+    auditLog: [...state.auditLog, auditEntry({
+      action: 'CREATE', entity: 'Journal', entityId: journal.id, sourceModule: 'Accounting',
+      newValue: `${journal.debitAccount} / ${journal.creditAccount} ${journal.amount.toLocaleString()} — ${journal.narration}`
+    })]
+  })),
+
+  // Audit trail
+  logAudit: (entry) => set((state) => ({
+    auditLog: [...state.auditLog, auditEntry(entry)]
+  })),
+
+  resetData: () => set((state) => ({
+    ...initialData,
+    auditLog: [...state.auditLog, auditEntry({ action: 'RESET', entity: 'DataStore', entityId: 'all', sourceModule: 'Settings', newValue: 'Restored seed data' })]
+  }))
 }), { name: 'afrirevision-data' }));

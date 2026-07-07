@@ -1,0 +1,41 @@
+# Roadmap
+
+## Delivered
+
+### Stage 1 — Foundation Stabilization & Functional Completion ✅
+Turned the prototype into a functional application: every interactive control wired to
+the store, forms validated, dead code removed (6 unused module variants), dark mode,
+and — critically — `DataStore` persistence to `localStorage`. See
+[CHANGELOG.md](./CHANGELOG.md).
+
+### Stage 2 — Enterprise Actuarial Engine ✅
+Replaced the demo actuarial screen with a live reserving workbench powered by
+`src/lib/actuarial.ts`: dynamic loss triangles, development factors, Chain Ladder /
+Bornhuetter-Ferguson / Cape Cod / Expected Loss Ratio, simplified Mack standard errors,
+inflation/trend adjustment, diagnostics, XOL analytics, portfolio analytics, charts,
+and exports. Actuary-selectable preferred method.
+
+### Stage 3 — Enterprise IFRS 17 Reporting Engine ✅
+Rebuilt IFRS 17 reporting on `src/ifrs17/*`: PAA/GMM measurement models, LRC/LIC
+roll-forwards, fulfilment cash flows, configurable risk adjustment, reinsurance
+issued/held, draft financial statements, roll-forwards, analytics, extensive filtering,
+and CSV/Excel/PDF exports. Reuses Stage 2 actuarial IBNR.
+
+## Direction (not yet built)
+
+The prototype now spans the full technical lifecycle client-side. The strategic gap is
+**persistence, multi-user, and real integration** — everything currently lives in one
+browser. See [NEXT_STAGE.md](./NEXT_STAGE.md) for the recommended next stage and
+[TECH_DEBT.md](./TECH_DEBT.md) for what to clean up along the way.
+
+Candidate future themes (unprioritised):
+
+- **Backend & period close** — a service to persist balances so IFRS 17 opening
+  balances become real, plus real authentication and RBAC.
+- **Retrocession completion** — make the retro program and allocations fully
+  store-driven (some illustrative data remains).
+- **Pricing engine** — turn the AI-styled pricing prototype into real rate models.
+- **Reporting depth** — proper PDF/Excel generation, yield-curve discounting,
+  multi-currency FX.
+- **Quality** — automated tests around the pure calculation libraries; fix the ESLint
+  config; code-split the >500 kB bundle.
