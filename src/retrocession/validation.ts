@@ -24,6 +24,31 @@ export const validateProgrammes = (programmes: RetroProgramme[]): ValidationIssu
       issues.push({ severity: 'error', scope: p.programmeCode, message: 'Proportional programme requires a cession percentage between 0 and 100' });
     }
 
+    // Type-specific arrangement checks
+    if (p.type === 'Surplus') {
+      if (!(p.maxLinePerRisk && p.maxLinePerRisk > 0)) {
+        issues.push({ severity: 'warning', scope: p.programmeCode, message: 'Surplus arrangement is missing the maximum line per risk' });
+      }
+      if (!(p.numberOfLines && p.numberOfLines >= 1)) {
+        issues.push({ severity: 'warning', scope: p.programmeCode, message: 'Surplus arrangement is missing the number of lines' });
+      }
+    }
+    if (p.type === 'Stop Loss') {
+      const attach = p.lossRatioAttachmentPct ?? 0;
+      const limit = p.lossRatioLimitPct ?? 0;
+      if (attach <= 0 || limit <= 0) {
+        issues.push({ severity: 'error', scope: p.programmeCode, message: 'Stop loss requires attachment and exhaustion loss ratios (% of subject premium)' });
+      } else if (limit <= attach) {
+        issues.push({ severity: 'error', scope: p.programmeCode, message: `Stop loss exhaustion (${limit}%) must exceed the attachment (${attach}%)` });
+      }
+    }
+    if (p.type === 'Aggregate' && !((p.aggregateLimit ?? 0) > 0)) {
+      issues.push({ severity: 'error', scope: p.programmeCode, message: 'Aggregate cover requires a positive annual aggregate limit' });
+    }
+    if (p.type === 'Facultative' && !p.linkedTreatyId) {
+      issues.push({ severity: 'error', scope: p.programmeCode, message: 'Facultative retro must be linked to a specific inward treaty' });
+    }
+
     // Layer checks
     const sorted = [...p.layers].sort((a, b) => a.attachmentPoint - b.attachmentPoint);
     sorted.forEach((layer, i) => {

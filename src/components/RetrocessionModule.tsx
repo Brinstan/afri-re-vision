@@ -21,7 +21,8 @@ import {
   buildMethodInputs, runAllMethods, DEFAULT_ASSUMPTIONS as ACTUARIAL_DEFAULTS, MethodKey
 } from '@/lib/actuarial';
 import { ALL_RETRO_FILTERS, RetroFilters } from '@/retrocession/types';
-import { computeRecoveries, recoveryTotals } from '@/retrocession/recoveryEngine';
+import { computeRecoveries, recoveryTotals, subjectPremium } from '@/retrocession/recoveryEngine';
+import { Checkbox } from "@/components/ui/checkbox";
 import { layerMetrics, programmeUtilization } from '@/retrocession/capacityEngine';
 import { counterpartyMetrics, concentrationFlags } from '@/retrocession/counterpartyEngine';
 import { validateAll } from '@/retrocession/validation';
@@ -102,12 +103,65 @@ const RetrocessionModule = () => {
 
   // ---- Dialog state ----------------------------------------------------------
   const [programmeDialogOpen, setProgrammeDialogOpen] = useState(false);
-  const [programmeForm, setProgrammeForm] = useState({
+  const emptyProgrammeForm = {
     programmeName: '', type: 'XOL' as RetroProgramme['type'], effectiveDate: '', expiryDate: '',
-    currency: 'USD', territory: 'East Africa', retroBroker: '', retention: '', cessionPct: '',
+    currency: 'USD', territory: 'East Africa', retroBroker: '',
     commissionPct: '', linesOfBusiness: [] as string[],
-    layerAttachment: '', layerLimit: '', layerPremium: ''
-  });
+    // Quota Share
+    cessionPct: '', eventLimit: '',
+    // Surplus
+    maxLinePerRisk: '', numberOfLines: '', avgCessionPct: '',
+    // XOL / Catastrophe
+    layerAttachment: '', layerLimit: '', rateOnLinePct: '', reinstatementsCount: '', reinstatementRatePct: '',
+    // Stop Loss
+    lossRatioAttachmentPct: '', lossRatioLimitPct: '', premiumRatePct: '',
+    // Aggregate
+    aggregateAttachment: '', aggregateLimit: '',
+    // Facultative
+    linkedTreatyId: '',
+    // Premium (all types — auto-suggested, editable)
+    layerPremium: ''
+  };
+  const [programmeForm, setProgrammeForm] = useState(emptyProgrammeForm);
+
+  // LOBs available in the inward portfolio (the programme picks from these)
+  const portfolioLobs = useMemo(
+    () => Array.from(new Set(treaties.flatMap(t => t.lineOfBusiness))).sort(),
+    [treaties]
+  );
+
+  // Live preview: which inward covers fall into the arrangement being drafted
+  const draftCoveredTreaties = useMemo(() => {
+    if (programmeForm.type === 'Facultative') {
+      return treaties.filter(t => t.id === programmeForm.linkedTreatyId);
+    }
+    if (programmeForm.linesOfBusiness.length === 0) return [];
+    return treaties.filter(t =>
+      t.lineOfBusiness.some(lob => programmeForm.linesOfBusiness.includes(lob)) &&
+      (!programmeForm.effectiveDate || !programmeForm.expiryDate ||
+        (t.inceptionDate <= programmeForm.expiryDate && t.expiryDate >= programmeForm.effectiveDate))
+    );
+  }, [treaties, programmeForm.linesOfBusiness, programmeForm.linkedTreatyId, programmeForm.type, programmeForm.effectiveDate, programmeForm.expiryDate]);
+
+  const draftSubjectPremium = draftCoveredTreaties.reduce((s, t) => s + t.premium, 0);
+
+  // Auto-suggested retro premium per arrangement type (user can override)
+  const suggestedPremium = useMemo(() => {
+    const f = programmeForm;
+    switch (f.type) {
+      case 'Quota Share':
+        return draftSubjectPremium * (parseFloat(f.cessionPct) || 0) / 100;
+      case 'Surplus':
+        return draftSubjectPremium * (parseFloat(f.avgCessionPct) || 0) / 100;
+      case 'XOL':
+      case 'Catastrophe':
+        return (parseFloat(f.layerLimit) || 0) * (parseFloat(f.rateOnLinePct) || 0) / 100;
+      case 'Stop Loss':
+        return draftSubjectPremium * (parseFloat(f.premiumRatePct) || 0) / 100;
+      default:
+        return 0;
+    }
+  }, [programmeForm, draftSubjectPremium]);
   const [placementDialog, setPlacementDialog] = useState<{ programmeId: string; layerId: string } | null>(null);
   const [placementForm, setPlacementForm] = useState({ retrocessionaireId: '', signedLinePct: '', slipStatus: 'Signed' });
   const [settleDialog, setSettleDialog] = useState<RetroClaim | null>(null);
@@ -119,52 +173,143 @@ const RetrocessionModule = () => {
 
   // ---- Handlers --------------------------------------------------------------
   const handleCreateProgramme = () => {
-    if (!programmeForm.programmeName || !programmeForm.retroBroker) { toast.error("Enter the programme name and retro broker"); return; }
-    if (!programmeForm.effectiveDate || !programmeForm.expiryDate || new Date(programmeForm.expiryDate) <= new Date(programmeForm.effectiveDate)) {
+    const f = programmeForm;
+    const num = (v: string) => parseFloat(v) || 0;
+
+    // ---- Common validation
+    if (!f.programmeName || !f.retroBroker) { toast.error("Enter the programme name and retro broker"); return; }
+    if (!f.effectiveDate || !f.expiryDate || new Date(f.expiryDate) <= new Date(f.effectiveDate)) {
       toast.error("Enter a valid coverage period (expiry after effective date)"); return;
     }
-    const isProportional = programmeForm.type === 'Quota Share' || programmeForm.type === 'Surplus';
-    const cession = parseFloat(programmeForm.cessionPct);
-    if (isProportional && (isNaN(cession) || cession <= 0 || cession > 100)) {
-      toast.error("Proportional programmes need a cession percentage between 0 and 100"); return;
+    if (f.type !== 'Facultative' && f.linesOfBusiness.length === 0) {
+      toast.error("Select at least one line of business — the arrangement picks up all inward covers on those lines"); return;
     }
-    const limit = parseFloat(programmeForm.layerLimit);
-    if (isNaN(limit) || limit <= 0) { toast.error("Enter a valid layer limit"); return; }
-    const premium = parseFloat(programmeForm.layerPremium);
-    if (isNaN(premium) || premium <= 0) { toast.error("Enter a valid layer premium"); return; }
+    if (f.type === 'Facultative' && !f.linkedTreatyId) {
+      toast.error("Facultative retro protects one specific inward treaty — select it"); return;
+    }
+    if (f.type !== 'Facultative' && draftCoveredTreaties.length === 0) {
+      toast.error("No inward treaties fall into this arrangement — check the lines of business and coverage period"); return;
+    }
 
-    const code = `RP-${new Date(programmeForm.effectiveDate).getFullYear()}-${String(retroProgrammes.length + 1).padStart(3, '0')}`;
-    const attachment = isProportional ? 0 : (parseFloat(programmeForm.layerAttachment) || 0);
+    const premium = num(f.layerPremium) || suggestedPremium;
+    if (premium <= 0) { toast.error("Enter or accept a retro premium greater than zero"); return; }
+
+    // ---- Type-specific validation + layer construction
+    let layer: { attachmentPoint: number; limit: number; name: string };
+    let cessionPct: number | undefined;
+    let retention = 0;
+    const extras: Partial<RetroProgramme> = {};
+
+    switch (f.type) {
+      case 'Quota Share': {
+        const cession = num(f.cessionPct);
+        if (cession <= 0 || cession > 100) { toast.error("Quota share cession must be between 0 and 100%"); return; }
+        const eventLimit = num(f.eventLimit) || draftSubjectPremium * cession / 100;
+        cessionPct = cession;
+        retention = draftSubjectPremium * (100 - cession) / 100;
+        layer = { attachmentPoint: 0, limit: eventLimit, name: `${cession}% Quota Share (event limit ${(eventLimit / 1_000_000).toFixed(1)}M)` };
+        break;
+      }
+      case 'Surplus': {
+        const maxLine = num(f.maxLinePerRisk);
+        const lines = num(f.numberOfLines);
+        const avgCession = num(f.avgCessionPct);
+        if (maxLine <= 0) { toast.error("Enter the maximum line retained per risk"); return; }
+        if (lines < 1) { toast.error("Enter the number of surplus lines (≥ 1)"); return; }
+        if (avgCession <= 0 || avgCession > 100) { toast.error("Enter the estimated average cession % (0–100) — actual cession varies per risk with sum insured"); return; }
+        cessionPct = avgCession;
+        retention = maxLine;
+        extras.maxLinePerRisk = maxLine;
+        extras.numberOfLines = lines;
+        layer = { attachmentPoint: 0, limit: maxLine * lines, name: `${lines}-line Surplus (max line ${(maxLine / 1_000_000).toFixed(1)}M, capacity ${((maxLine * lines) / 1_000_000).toFixed(1)}M)` };
+        break;
+      }
+      case 'XOL':
+      case 'Catastrophe': {
+        const attachment = num(f.layerAttachment);
+        const limit = num(f.layerLimit);
+        if (attachment <= 0) { toast.error("Enter the layer attachment point (your retention per event)"); return; }
+        if (limit <= 0) { toast.error("Enter the layer limit"); return; }
+        retention = attachment;
+        extras.reinstatementsCount = num(f.reinstatementsCount) || undefined;
+        extras.reinstatementRatePct = num(f.reinstatementRatePct) || undefined;
+        layer = {
+          attachmentPoint: attachment, limit,
+          name: `${f.type === 'Catastrophe' ? 'Cat ' : ''}Layer — ${(limit / 1_000_000).toFixed(0)}M xs ${(attachment / 1_000_000).toFixed(0)}M${extras.reinstatementsCount ? ` (${extras.reinstatementsCount} reinst @ ${extras.reinstatementRatePct ?? 100}%)` : ''}`
+        };
+        break;
+      }
+      case 'Stop Loss': {
+        const lrAttach = num(f.lossRatioAttachmentPct);
+        const lrLimit = num(f.lossRatioLimitPct);
+        if (lrAttach <= 0 || lrLimit <= 0) { toast.error("Enter attachment and exhaustion loss ratios (% of subject premium)"); return; }
+        if (lrLimit <= lrAttach) { toast.error(`Exhaustion (${lrLimit}%) must exceed the attachment (${lrAttach}%)`); return; }
+        extras.lossRatioAttachmentPct = lrAttach;
+        extras.lossRatioLimitPct = lrLimit;
+        retention = draftSubjectPremium * lrAttach / 100;
+        layer = {
+          attachmentPoint: retention,
+          limit: draftSubjectPremium * (lrLimit - lrAttach) / 100,
+          name: `Stop Loss ${lrLimit}% xs ${lrAttach}% of subject premium`
+        };
+        break;
+      }
+      case 'Aggregate': {
+        const aggAttach = num(f.aggregateAttachment);
+        const aggLimit = num(f.aggregateLimit);
+        if (aggLimit <= 0) { toast.error("Enter the annual aggregate limit"); return; }
+        extras.aggregateAttachment = aggAttach;
+        extras.aggregateLimit = aggLimit;
+        retention = aggAttach;
+        layer = { attachmentPoint: aggAttach, limit: aggLimit, name: `Annual Aggregate ${(aggLimit / 1_000_000).toFixed(0)}M xs ${(aggAttach / 1_000_000).toFixed(0)}M` };
+        break;
+      }
+      case 'Facultative': {
+        const attachment = num(f.layerAttachment);
+        const limit = num(f.layerLimit);
+        if (limit <= 0) { toast.error("Enter the facultative cover limit"); return; }
+        const linked = treaties.find(t => t.id === f.linkedTreatyId);
+        extras.linkedTreatyId = f.linkedTreatyId;
+        retention = attachment;
+        layer = { attachmentPoint: attachment, limit, name: `Fac on ${linked?.treatyName ?? 'treaty'} — ${(limit / 1_000_000).toFixed(1)}M xs ${(attachment / 1_000_000).toFixed(1)}M` };
+        break;
+      }
+    }
+
+    const code = `RP-${new Date(f.effectiveDate).getFullYear()}-${String(retroProgrammes.length + 1).padStart(3, '0')}`;
+    const linkedTreaty = treaties.find(t => t.id === f.linkedTreatyId);
     addRetroProgramme({
       id: `rp-${Date.now()}`,
       programmeCode: code,
-      programmeName: programmeForm.programmeName,
-      type: programmeForm.type,
-      effectiveDate: programmeForm.effectiveDate,
-      expiryDate: programmeForm.expiryDate,
-      currency: programmeForm.currency,
-      linesOfBusiness: programmeForm.linesOfBusiness.length > 0 ? programmeForm.linesOfBusiness : lobs,
-      territory: programmeForm.territory,
+      programmeName: f.programmeName,
+      type: f.type,
+      effectiveDate: f.effectiveDate,
+      expiryDate: f.expiryDate,
+      currency: f.currency,
+      linesOfBusiness: f.type === 'Facultative' ? (linkedTreaty?.lineOfBusiness ?? []) : f.linesOfBusiness,
+      territory: f.territory,
       cedingCompany: 'AfriRe Tanzania',
-      retroBroker: programmeForm.retroBroker,
-      retention: parseFloat(programmeForm.retention) || attachment,
-      cessionPct: isProportional ? cession : undefined,
-      commissionPct: parseFloat(programmeForm.commissionPct) || 0,
+      retroBroker: f.retroBroker,
+      retention,
+      cessionPct,
+      commissionPct: num(f.commissionPct),
       status: 'Active',
       renewalStatus: 'New',
+      ...extras,
       layers: [{
         id: `rl-${Date.now()}`,
-        name: isProportional
-          ? `${cession}% ${programmeForm.type}`
-          : `Layer 1 — ${(limit / 1_000_000).toFixed(0)}M xs ${(attachment / 1_000_000).toFixed(0)}M`,
-        attachmentPoint: attachment,
-        limit,
+        name: layer.name,
+        attachmentPoint: layer.attachmentPoint,
+        limit: layer.limit,
         premium,
         placements: []
       }]
     });
     setProgrammeDialogOpen(false);
-    toast.success(`Programme ${code} created — place the layer with retrocessionaires next (signed lines must reach 100%)`);
+    setProgrammeForm(emptyProgrammeForm);
+    toast.success(
+      `Programme ${code} created covering ${f.type === 'Facultative' ? 1 : draftCoveredTreaties.length} inward ${draftCoveredTreaties.length === 1 ? 'treaty' : 'treaties'} — place the layer next (signed lines must reach 100%)`
+    );
   };
 
   const handleAddPlacement = () => {
@@ -441,7 +586,21 @@ const RetrocessionModule = () => {
                       </div>
                     ))}
                   </div>
-                  <p className="text-xs text-muted-foreground">Programme utilization {util.toFixed(1)}% · Commission {p.commissionPct}%{p.cessionPct ? ` · Cession ${p.cessionPct}%` : ''}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Programme utilization {util.toFixed(1)}% · Commission {p.commissionPct}%{p.cessionPct ? ` · Cession ${p.cessionPct}%` : ''}
+                    {p.type === 'Stop Loss' && p.lossRatioAttachmentPct ? ` · ${p.lossRatioLimitPct}% xs ${p.lossRatioAttachmentPct}% LR` : ''}
+                    {p.maxLinePerRisk ? ` · Max line ${fmt(p.maxLinePerRisk)} × ${p.numberOfLines} lines` : ''}
+                    {p.reinstatementsCount ? ` · ${p.reinstatementsCount} reinst @ ${p.reinstatementRatePct ?? 100}%` : ''}
+                  </p>
+                  <p className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                    Covers {p.linkedTreatyId
+                      ? `1 linked treaty (${treaties.find(t => t.id === p.linkedTreatyId)?.treatyName ?? '—'})`
+                      : `${treaties.filter(t =>
+                          t.lineOfBusiness.some(lob => p.linesOfBusiness.includes(lob)) &&
+                          t.inceptionDate <= p.expiryDate && t.expiryDate >= p.effectiveDate
+                        ).length} inward treaties on ${p.linesOfBusiness.join(', ')}`}
+                    {' '}· subject premium {p.currency} {fmt(subjectPremium(p, treaties))} — new treaties on these lines fall in automatically
+                  </p>
                 </CardContent>
               </Card>
             );
@@ -920,21 +1079,30 @@ const RetrocessionModule = () => {
         </TabsContent>
       </Tabs>
 
-      {/* ---------------- New programme dialog */}
+      {/* ---------------- New programme dialog (type-specific arrangement forms) */}
       <Dialog open={programmeDialogOpen} onOpenChange={setProgrammeDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Retrocession Programme</DialogTitle>
-            <DialogDescription>Creates the programme with its first layer — add placements afterwards until signed lines reach 100%</DialogDescription>
+            <DialogTitle>New Retrocession Programme — {programmeForm.type}</DialogTitle>
+            <DialogDescription>
+              {programmeForm.type === 'Quota Share' && 'A fixed share of every covered inward treaty is ceded; premium follows the cession.'}
+              {programmeForm.type === 'Surplus' && 'Cessions above your maximum line per risk, up to the number of lines. Actual cession varies by risk size.'}
+              {programmeForm.type === 'XOL' && 'Per-risk/per-event excess of loss: recoveries when a loss exceeds the attachment, up to the layer limit.'}
+              {programmeForm.type === 'Catastrophe' && 'Event-based excess of loss protecting accumulations from a single catastrophe across covered lines.'}
+              {programmeForm.type === 'Stop Loss' && 'Aggregate protection: pays when the covered loss ratio exceeds the attachment, up to the exhaustion — both as % of subject premium.'}
+              {programmeForm.type === 'Aggregate' && 'Annual aggregate cover: pays when total covered losses in the period exceed the monetary attachment, up to the aggregate limit.'}
+              {programmeForm.type === 'Facultative' && 'Protects one specific inward treaty rather than a whole line of business.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* ---- Common details */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Programme Name *</Label>
-                <Input value={programmeForm.programmeName} onChange={(e) => setProgrammeForm(f => ({ ...f, programmeName: e.target.value }))} placeholder="e.g. Property Cat XOL 2025" />
+                <Input value={programmeForm.programmeName} onChange={(e) => setProgrammeForm(f => ({ ...f, programmeName: e.target.value }))} placeholder="e.g. Fire & Engineering Surplus 2025" />
               </div>
               <div className="space-y-2">
-                <Label>Type</Label>
+                <Label>Arrangement Type</Label>
                 <Select value={programmeForm.type} onValueChange={(v) => setProgrammeForm(f => ({ ...f, type: v as RetroProgramme['type'] }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -972,35 +1140,179 @@ const RetrocessionModule = () => {
                 <Input value={programmeForm.territory} onChange={(e) => setProgrammeForm(f => ({ ...f, territory: e.target.value }))} />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              {(programmeForm.type === 'Quota Share' || programmeForm.type === 'Surplus') ? (
+
+            {/* ---- Business covered: LOB auto-pick or fac treaty link */}
+            {programmeForm.type === 'Facultative' ? (
+              <div className="space-y-2">
+                <Label>Protected Inward Treaty *</Label>
+                <Select value={programmeForm.linkedTreatyId} onValueChange={(v) => setProgrammeForm(f => ({ ...f, linkedTreatyId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select the treaty this fac protects" /></SelectTrigger>
+                  <SelectContent>
+                    {treaties.map(t => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.treatyName} ({t.contractNumber}) — {t.lineOfBusiness.join(', ')} · premium {fmt(t.premium)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Lines of Business Covered * <span className="text-xs text-muted-foreground font-normal">(from your inward portfolio — every treaty on these lines falls into the cover)</span></Label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 border rounded-lg p-3">
+                  {portfolioLobs.map(lob => (
+                    <div key={lob} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`lob-${lob}`}
+                        checked={programmeForm.linesOfBusiness.includes(lob)}
+                        onCheckedChange={(checked) => setProgrammeForm(f => ({
+                          ...f,
+                          linesOfBusiness: checked
+                            ? [...f.linesOfBusiness, lob]
+                            : f.linesOfBusiness.filter(l => l !== lob)
+                        }))}
+                      />
+                      <Label htmlFor={`lob-${lob}`} className="text-sm font-normal">{lob}</Label>
+                    </div>
+                  ))}
+                  {portfolioLobs.length === 0 && <p className="text-sm text-muted-foreground col-span-3">No inward treaties exist yet — write business first.</p>}
+                </div>
+              </div>
+            )}
+
+            {/* ---- Live covered-business preview */}
+            {(programmeForm.linesOfBusiness.length > 0 || programmeForm.linkedTreatyId) && (
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 text-sm space-y-1">
+                <p className="font-medium">
+                  {draftCoveredTreaties.length} inward {draftCoveredTreaties.length === 1 ? 'treaty falls' : 'treaties fall'} into this arrangement
+                  · subject premium {programmeForm.currency} {fmt(draftSubjectPremium)}
+                </p>
+                {draftCoveredTreaties.slice(0, 5).map(t => (
+                  <p key={t.id} className="text-xs text-muted-foreground">
+                    • {t.treatyName} ({t.lineOfBusiness.join(', ')}) — premium {fmt(t.premium)}
+                  </p>
+                ))}
+                {draftCoveredTreaties.length > 5 && <p className="text-xs text-muted-foreground">…and {draftCoveredTreaties.length - 5} more</p>}
+                {draftCoveredTreaties.length === 0 && <p className="text-xs text-red-600">Nothing matches yet — adjust the lines or coverage period.</p>}
+              </div>
+            )}
+
+            {/* ---- Type-specific arrangement terms */}
+            {programmeForm.type === 'Quota Share' && (
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Cession % *</Label>
-                  <Input type="number" step="0.5" value={programmeForm.cessionPct} onChange={(e) => setProgrammeForm(f => ({ ...f, cessionPct: e.target.value }))} />
+                  <Input type="number" step="0.5" value={programmeForm.cessionPct} onChange={(e) => setProgrammeForm(f => ({ ...f, cessionPct: e.target.value }))} placeholder="25" />
                 </div>
-              ) : (
                 <div className="space-y-2">
-                  <Label>Layer Attachment *</Label>
+                  <Label>Event Limit <span className="text-xs text-muted-foreground font-normal">(optional cap per loss)</span></Label>
+                  <Input type="number" value={programmeForm.eventLimit} onChange={(e) => setProgrammeForm(f => ({ ...f, eventLimit: e.target.value }))} placeholder="defaults to ceded premium" />
+                </div>
+              </div>
+            )}
+
+            {programmeForm.type === 'Surplus' && (
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Max Line per Risk *</Label>
+                  <Input type="number" value={programmeForm.maxLinePerRisk} onChange={(e) => setProgrammeForm(f => ({ ...f, maxLinePerRisk: e.target.value }))} placeholder="1000000" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Number of Lines *</Label>
+                  <Input type="number" value={programmeForm.numberOfLines} onChange={(e) => setProgrammeForm(f => ({ ...f, numberOfLines: e.target.value }))} placeholder="9" />
+                  {(parseFloat(programmeForm.maxLinePerRisk) || 0) > 0 && (parseFloat(programmeForm.numberOfLines) || 0) > 0 && (
+                    <p className="text-xs text-muted-foreground">Capacity: {fmt((parseFloat(programmeForm.maxLinePerRisk) || 0) * (parseFloat(programmeForm.numberOfLines) || 0))}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Est. Avg Cession % *</Label>
+                  <Input type="number" step="0.5" value={programmeForm.avgCessionPct} onChange={(e) => setProgrammeForm(f => ({ ...f, avgCessionPct: e.target.value }))} placeholder="60" />
+                  <p className="text-xs text-muted-foreground">Actual cession varies per risk with sum insured (no per-risk data yet)</p>
+                </div>
+              </div>
+            )}
+
+            {(programmeForm.type === 'XOL' || programmeForm.type === 'Catastrophe' || programmeForm.type === 'Facultative') && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Attachment Point {programmeForm.type !== 'Facultative' && '*'} <span className="text-xs text-muted-foreground font-normal">(your retention per {programmeForm.type === 'Catastrophe' ? 'event' : 'risk'})</span></Label>
                   <Input type="number" value={programmeForm.layerAttachment} onChange={(e) => setProgrammeForm(f => ({ ...f, layerAttachment: e.target.value }))} placeholder="2000000" />
                 </div>
-              )}
-              <div className="space-y-2">
-                <Label>Layer Limit *</Label>
-                <Input type="number" value={programmeForm.layerLimit} onChange={(e) => setProgrammeForm(f => ({ ...f, layerLimit: e.target.value }))} placeholder="8000000" />
+                <div className="space-y-2">
+                  <Label>Layer Limit *</Label>
+                  <Input type="number" value={programmeForm.layerLimit} onChange={(e) => setProgrammeForm(f => ({ ...f, layerLimit: e.target.value }))} placeholder="8000000" />
+                </div>
+                {programmeForm.type !== 'Facultative' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Reinstatements</Label>
+                      <Input type="number" value={programmeForm.reinstatementsCount} onChange={(e) => setProgrammeForm(f => ({ ...f, reinstatementsCount: e.target.value }))} placeholder="1" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Reinstatement Rate %</Label>
+                      <Input type="number" step="5" value={programmeForm.reinstatementRatePct} onChange={(e) => setProgrammeForm(f => ({ ...f, reinstatementRatePct: e.target.value }))} placeholder="100" />
+                    </div>
+                    <div className="space-y-2 col-span-2">
+                      <Label>Rate on Line % <span className="text-xs text-muted-foreground font-normal">(drives the suggested premium: ROL × limit)</span></Label>
+                      <Input type="number" step="0.5" value={programmeForm.rateOnLinePct} onChange={(e) => setProgrammeForm(f => ({ ...f, rateOnLinePct: e.target.value }))} placeholder="12" />
+                    </div>
+                  </>
+                )}
               </div>
-              <div className="space-y-2">
-                <Label>Layer Premium *</Label>
-                <Input type="number" value={programmeForm.layerPremium} onChange={(e) => setProgrammeForm(f => ({ ...f, layerPremium: e.target.value }))} placeholder="1200000" />
+            )}
+
+            {programmeForm.type === 'Stop Loss' && (
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Attachment Loss Ratio % *</Label>
+                  <Input type="number" step="5" value={programmeForm.lossRatioAttachmentPct} onChange={(e) => setProgrammeForm(f => ({ ...f, lossRatioAttachmentPct: e.target.value }))} placeholder="80" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Exhaustion Loss Ratio % *</Label>
+                  <Input type="number" step="5" value={programmeForm.lossRatioLimitPct} onChange={(e) => setProgrammeForm(f => ({ ...f, lossRatioLimitPct: e.target.value }))} placeholder="120" />
+                  {draftSubjectPremium > 0 && (parseFloat(programmeForm.lossRatioLimitPct) || 0) > (parseFloat(programmeForm.lossRatioAttachmentPct) || 0) && (
+                    <p className="text-xs text-muted-foreground">
+                      ≈ cover of {fmt(draftSubjectPremium * ((parseFloat(programmeForm.lossRatioLimitPct) || 0) - (parseFloat(programmeForm.lossRatioAttachmentPct) || 0)) / 100)} on current subject premium
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Premium Rate % of Subject *</Label>
+                  <Input type="number" step="0.25" value={programmeForm.premiumRatePct} onChange={(e) => setProgrammeForm(f => ({ ...f, premiumRatePct: e.target.value }))} placeholder="5" />
+                </div>
               </div>
-            </div>
+            )}
+
+            {programmeForm.type === 'Aggregate' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Annual Aggregate Attachment</Label>
+                  <Input type="number" value={programmeForm.aggregateAttachment} onChange={(e) => setProgrammeForm(f => ({ ...f, aggregateAttachment: e.target.value }))} placeholder="5000000" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Annual Aggregate Limit *</Label>
+                  <Input type="number" value={programmeForm.aggregateLimit} onChange={(e) => setProgrammeForm(f => ({ ...f, aggregateLimit: e.target.value }))} placeholder="20000000" />
+                </div>
+              </div>
+            )}
+
+            {/* ---- Premium & commission (all types) */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Override Commission %</Label>
-                <Input type="number" step="0.5" value={programmeForm.commissionPct} onChange={(e) => setProgrammeForm(f => ({ ...f, commissionPct: e.target.value }))} />
+                <Label>Retro Premium *</Label>
+                <Input
+                  type="number"
+                  value={programmeForm.layerPremium}
+                  onChange={(e) => setProgrammeForm(f => ({ ...f, layerPremium: e.target.value }))}
+                  placeholder={suggestedPremium > 0 ? `suggested: ${Math.round(suggestedPremium).toLocaleString()}` : 'enter premium'}
+                />
+                {suggestedPremium > 0 && !programmeForm.layerPremium && (
+                  <p className="text-xs text-muted-foreground">Leave blank to accept the suggested {fmt(suggestedPremium)}</p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label>Retention (below programme)</Label>
-                <Input type="number" value={programmeForm.retention} onChange={(e) => setProgrammeForm(f => ({ ...f, retention: e.target.value }))} />
+                <Label>Override Commission %</Label>
+                <Input type="number" step="0.5" value={programmeForm.commissionPct} onChange={(e) => setProgrammeForm(f => ({ ...f, commissionPct: e.target.value }))} placeholder="10" />
               </div>
             </div>
           </div>

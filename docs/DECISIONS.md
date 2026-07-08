@@ -3,6 +3,19 @@
 A log of consequential decisions and their rationale, so future work doesn't
 re-litigate them. Newest first.
 
+## D-011 · Stage 5.1 — Type-specific arrangement forms and recovery bases
+Each retro type captures its own terms (QS: cession % + event limit; Surplus:
+max line × number of lines + estimated average cession; XOL/Cat: attachment,
+limit, reinstatements, rate-on-line; Stop Loss: attachment/exhaustion loss
+ratios of LIVE subject premium; Aggregate: monetary annual attachment/limit;
+Facultative: linked to one inward treaty). The recovery engine allocates on the
+matching basis — per-claim for per-risk types, aggregate for Stop Loss and
+Aggregate (distributed back pro-rata for the register). Lines of business are
+picked from the actual inward portfolio, and covered treaties are matched
+automatically (LOB + period overlap), so new inward business falls into
+existing covers without any manual linkage. Surplus uses an estimated average
+cession because per-risk sum-insured data does not exist yet (TECH_DEBT).
+
 ## D-010 · Stage 5 — Retro programme premiums supersede treaty retroPercentage in journals
 When retro programmes exist, the accounting engine derives outward premium from
 programme layers (per-layer premium + override commission) and **skips** the

@@ -178,6 +178,26 @@ export interface RetroProgramme {
   layers: RetroLayer[];
   status: 'Active' | 'Pending' | 'Expired' | 'Cancelled';
   renewalStatus: 'New' | 'Renewal' | 'Mid-term Adjustment';
+
+  // ---- Type-specific arrangement terms ----
+  /** Surplus: maximum line retained per risk. */
+  maxLinePerRisk?: number;
+  /** Surplus: number of lines ceded (capacity = lines × max line). */
+  numberOfLines?: number;
+  /** XOL / Catastrophe: paid reinstatements available. */
+  reinstatementsCount?: number;
+  /** XOL / Catastrophe: reinstatement premium rate (% of pro-rata premium). */
+  reinstatementRatePct?: number;
+  /** Stop Loss: attachment expressed as a loss ratio % of subject premium. */
+  lossRatioAttachmentPct?: number;
+  /** Stop Loss: cover exhaustion as a loss ratio % of subject premium. */
+  lossRatioLimitPct?: number;
+  /** Aggregate: annual aggregate attachment (monetary). */
+  aggregateAttachment?: number;
+  /** Aggregate: annual aggregate limit (monetary). */
+  aggregateLimit?: number;
+  /** Facultative: the specific inward treaty this fac retro protects. */
+  linkedTreatyId?: string;
 }
 
 export interface RetroClaim {
