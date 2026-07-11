@@ -3,6 +3,20 @@
 A log of consequential decisions and their rationale, so future work doesn't
 re-litigate them. Newest first.
 
+## D-013 · Stage 6A — Credibility blend is the pricing basis
+The office premium is always driven by a limited-fluctuation credibility blend
+(Z = √(n/N)) of the experience side (experience rating, falling back to burning
+cost) against the exposure prior (exposure rating, falling back to ELR). All
+five methods are shown for comparison, but the blend removes the temptation to
+cherry-pick a method. N (full-credibility claim count) is a user assumption.
+
+## D-012 · Stage 6A — Simplified exposure curve, documented
+Exposure rating for layers uses a one-parameter power curve G(x)=1−(1−x)^c on
+an MPL proxy (largest trended loss, floored at layer exhaustion) because no
+per-risk sum-insured profile exists. The exponent is a visible assumption, not
+a hidden constant. Replace with market curves (Swiss Re Y-curves etc.) when a
+risk-profile data model lands.
+
 ## D-011 · Stage 5.1 — Type-specific arrangement forms and recovery bases
 Each retro type captures its own terms (QS: cession % + event limit; Surplus:
 max line × number of lines + estimated average cession; XOL/Cat: attachment,

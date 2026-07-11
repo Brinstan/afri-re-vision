@@ -24,6 +24,10 @@ None of these block current functionality; they matter for productionisation.
 | 28 | Legacy `treaty.retroPercentage` still drives IFRS 17 Reinsurance Held; programme-based cession supersedes it only in accounting journals | `ifrs17/financialStatements.ts`, `accounting/journals.ts` |
 | 29 | Surplus retro uses an estimated average cession % — true surplus cession varies per risk with sum insured, which doesn't exist in the data model | `retrocession/recoveryEngine.ts` |
 | 30 | Reinstatement terms on XOL/Cat retro are captured and displayed but reinstatement premiums on retro recoveries are not yet auto-booked | `retrocession/recoveryEngine.ts` |
+| 31 | ~~Pricing metrics illustrative~~ **Resolved in Stage 6A** — item 13 superseded; all pricing computes from live data | `PricingSystem.tsx` |
+| 32 | Exposure rating uses a one-parameter power curve on an MPL proxy, not market exposure curves (no per-risk sum-insured profile) | `pricing/exposureRating.ts` |
+| 33 | Stop-loss exposure rating is a deterministic excess over the ELR — no aggregate loss distribution/volatility model | `pricing/exposureRating.ts` |
+| 34 | Surplus pricing relies on a user-estimated ceded share (same per-risk data gap as #29) | `pricing/treatyPricing.ts` |
 
 ## Calculation simplifications (intentional, documented)
 

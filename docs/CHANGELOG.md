@@ -2,6 +2,32 @@
 
 All notable changes, by delivered stage. Commits are on `main`.
 
+## Stage 6A — Enterprise Traditional Pricing Engine
+
+Replaced the mock "AI-Powered Pricing" screen with a deterministic actuarial
+pricing workstation ("Pricing System") built on `src/pricing/` — no AI/ML in
+this phase (that is Stage 6B).
+
+- **`src/pricing/` engines (11 files):** `types.ts`, `assumptions.ts`
+  (persisted loadings/inflation/credibility parameters), `burningCost.ts`
+  (trended experience table, burning cost, experience rating with worst-year
+  trimming + stability margin), `exposureRating.ts` (power exposure curve for
+  layers; cession/ELR for proportional; deterministic excess for stop loss),
+  `frequencySeverity.ts` (frequency × hit probability × in-structure severity),
+  `credibility.ts` (limited-fluctuation √(n/N) blend of experience vs exposure
+  prior), `premiumBuildUp.ts` (technical → office premium via the loading
+  division method; rate on subject and rate on line), `treatyPricing.ts`
+  (orchestrator for all six arrangement types), `scenario.ts` (5 standard
+  stresses re-run through the full pipeline), `validation.ts`, `analytics.ts`
+  (portfolio rate adequacy by line), `reporting.ts` (CSV + print-to-PDF memo).
+- **UI:** 6-tab workstation (Setup, Methods, Premium Build-Up, Scenarios,
+  Validation, Portfolio Analytics) with LOB selection from the live portfolio,
+  type-specific structure inputs, derived subject premium with override,
+  persisted pricing history (Draft/Quoted), and headline premium cards.
+- All hardcoded metrics removed; every figure computes from live DataStore
+  claims/treaties and Stage 2 helpers (`claimIncurred`, `inflate`).
+- Dashboard nav renamed "AI Pricing" → "Pricing".
+
 ## Stage 5 — Enterprise Retrocession Management Platform
 
 Rebuilt `RetrocessionModule.tsx` as an outward-reinsurance platform with engine

@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,563 +6,655 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Slider } from "@/components/ui/slider";
-import { TrendingUp, Brain, Target, Zap, FileText, Download, Plus, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/sonner";
+import { AlertTriangle, Calculator, CheckCircle, Download, FileText, Save, Scale, TrendingUp } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useDataStore } from './DataStore';
+import {
+  PricingAssumptions, PricingRecord, PricingStructure, PricingTreatyType, PRICING_METHOD_LABELS
+} from '@/pricing/types';
+import {
+  DEFAULT_PRICING_ASSUMPTIONS, loadPricingAssumptions, savePricingAssumptions, PRICING_HISTORY_KEY
+} from '@/pricing/assumptions';
+import { priceStructure } from '@/pricing/treatyPricing';
+import { runScenarios } from '@/pricing/scenario';
+import { validatePricing } from '@/pricing/validation';
+import { rateAdequacyByLob } from '@/pricing/analytics';
+import { exportPricingCsv, exportPricingMemoPdf } from '@/pricing/reporting';
+
+const fmt = (n: number) => Math.round(n).toLocaleString();
+const fmtM = (n: number) => `${(n / 1_000_000).toFixed(2)}M`;
+
+const TREATY_TYPES: PricingTreatyType[] = ['Quota Share', 'Surplus', 'XOL', 'Stop Loss', 'Catastrophe', 'Facultative'];
+
+const loadHistory = (): PricingRecord[] => {
+  try {
+    const saved = localStorage.getItem(PRICING_HISTORY_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch { return []; }
+};
 
 const PricingSystem = () => {
-  const [treatyType, setTreatyType] = useState("quota");
-  const [lineOfBusiness, setLineOfBusiness] = useState("motor");
-  const [pricingInProgress, setPricingInProgress] = useState(false);
-  const [aiConfidence, setAiConfidence] = useState([85]);
-  const [activeTab, setActiveTab] = useState("setup");
+  const { treaties, claims } = useDataStore();
+
+  const [assumptions, setAssumptions] = useState<PricingAssumptions>(loadPricingAssumptions);
+  useEffect(() => { savePricingAssumptions(assumptions); }, [assumptions]);
+  const setAssumption = <K extends keyof PricingAssumptions>(key: K, value: number) =>
+    setAssumptions(a => ({ ...a, [key]: value }));
+
+  const [history, setHistory] = useState<PricingRecord[]>(loadHistory);
+  useEffect(() => { localStorage.setItem(PRICING_HISTORY_KEY, JSON.stringify(history)); }, [history]);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [pricingHistory, setPricingHistory] = useState<Array<{ date: string; treatyType: string; lineOfBusiness: string; confidence: number; outcome: string }>>([]);
 
-  const handleGeneratePricing = () => {
-    setPricingInProgress(true);
-    setTimeout(() => {
-      setPricingInProgress(false);
-      setPricingHistory(prev => [...prev, {
-        date: new Date().toLocaleString(),
-        treatyType,
-        lineOfBusiness,
-        confidence: aiConfidence[0],
-        outcome: 'Generated'
-      }]);
-      setActiveTab("results");
-      toast.success("AI pricing generated — review the results tab");
-    }, 4000);
-  };
+  // ---- Structure being priced ------------------------------------------------
+  const [treatyType, setTreatyType] = useState<PricingTreatyType>('XOL');
+  const [selectedLobs, setSelectedLobs] = useState<string[]>([]);
+  const [linkedTreatyId, setLinkedTreatyId] = useState('');
+  const [cessionPct, setCessionPct] = useState('');
+  const [attachment, setAttachment] = useState('');
+  const [limit, setLimit] = useState('');
+  const [lrAttachPct, setLrAttachPct] = useState('');
+  const [lrExhaustPct, setLrExhaustPct] = useState('');
+  const [subjectPremiumOverride, setSubjectPremiumOverride] = useState('');
 
-  const handleAcceptPricing = () => {
-    setPricingHistory(prev => [...prev, {
-      date: new Date().toLocaleString(),
+  const portfolioLobs = useMemo(
+    () => Array.from(new Set(treaties.flatMap(t => t.lineOfBusiness))).sort(),
+    [treaties]
+  );
+
+  const scopeTreaties = useMemo(() => {
+    if (treatyType === 'Facultative') return treaties.filter(t => t.id === linkedTreatyId);
+    if (selectedLobs.length === 0) return [];
+    return treaties.filter(t => t.lineOfBusiness.some(l => selectedLobs.includes(l)));
+  }, [treaties, treatyType, linkedTreatyId, selectedLobs]);
+
+  const derivedSubjectPremium = scopeTreaties.reduce((s, t) => s + t.premium, 0);
+  const subjectPremium = parseFloat(subjectPremiumOverride) || derivedSubjectPremium;
+
+  const structure: PricingStructure = useMemo(() => ({
+    treatyType,
+    linesOfBusiness: treatyType === 'Facultative'
+      ? (scopeTreaties[0]?.lineOfBusiness ?? [])
+      : selectedLobs,
+    subjectPremium,
+    currency: scopeTreaties[0]?.currency ?? 'USD',
+    cessionPct: parseFloat(cessionPct) || undefined,
+    attachment: parseFloat(attachment) || undefined,
+    limit: parseFloat(limit) || undefined,
+    lrAttachPct: parseFloat(lrAttachPct) || undefined,
+    lrExhaustPct: parseFloat(lrExhaustPct) || undefined,
+    linkedTreatyId: treatyType === 'Facultative' ? linkedTreatyId || undefined : undefined
+  }), [treatyType, selectedLobs, subjectPremium, cessionPct, attachment, limit, lrAttachPct, lrExhaustPct, linkedTreatyId, scopeTreaties]);
+
+  // ---- Pricing pipeline (live) -------------------------------------------------
+  const output = useMemo(() => priceStructure(claims, treaties, structure, assumptions), [claims, treaties, structure, assumptions]);
+  const scenarios = useMemo(() => runScenarios(claims, treaties, structure, assumptions), [claims, treaties, structure, assumptions]);
+  const issues = useMemo(() => validatePricing(structure, assumptions, output.buildUp, output.experience), [structure, assumptions, output]);
+  const adequacy = useMemo(() => rateAdequacyByLob(treaties, claims, assumptions), [treaties, claims, assumptions]);
+  const errorCount = issues.filter(i => i.severity === 'error').length;
+  const b = output.buildUp;
+
+  const handleSavePricing = (outcome: PricingRecord['outcome']) => {
+    if (errorCount > 0) { toast.error("Resolve validation errors before saving the pricing"); return; }
+    if (b.officePremium <= 0) { toast.error("Nothing to save — the office premium is zero"); return; }
+    const record: PricingRecord = {
+      id: `pr-${Date.now()}`,
+      date: new Date().toISOString(),
       treatyType,
-      lineOfBusiness,
-      confidence: aiConfidence[0],
-      outcome: 'Accepted'
-    }]);
-    toast.success("AI pricing accepted and recorded in pricing history");
+      linesOfBusiness: structure.linesOfBusiness,
+      subjectPremium,
+      officePremium: b.officePremium,
+      ratePct: b.ratePct,
+      selectedBasis: output.selectedBasis,
+      outcome
+    };
+    setHistory(prev => [...prev, record]);
+    toast.success(`Pricing saved as ${outcome} — office premium ${structure.currency} ${fmt(b.officePremium)}`);
   };
 
-  const handleExportPricingReport = () => {
-    const lines = [
-      'AI PRICING REPORT',
-      `Generated: ${new Date().toLocaleString()}`,
-      `Treaty Type: ${treatyType}`,
-      `Line of Business: ${lineOfBusiness}`,
-      `AI Confidence: ${aiConfidence[0]}%`,
-      '',
-      'PRICING METRICS',
-      ...pricingMetrics.map(m => `${m.label}: ${m.value} (${m.benchmark})`),
-      '',
-      'LAYER STRUCTURE',
-      ...layers.map(l => `${l.layer}: limit ${l.limit}, retention ${l.retention}, rate ${l.rate}%, premium USD ${layerPremium(l).toLocaleString()}`)
-    ];
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `ai-pricing-report-${new Date().toISOString().split('T')[0]}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success("Pricing report exported");
+  const handleExportMemo = () => {
+    const ok = exportPricingMemoPdf({ structure, assumptions, output, scenarios, issues, adequacy });
+    if (ok) toast.success("Pricing memo opened — use the print dialog to save as PDF");
+    else toast.error("Pop-up blocked — allow pop-ups to export the memo");
   };
 
-  const pricingMetrics = [
-    { label: "Technical Rate", value: "12.5%", benchmark: "Market: 14.2%", status: "competitive" },
-    { label: "Commercial Rate", value: "15.8%", benchmark: "Target: 15.0%", status: "optimal" },
-    { label: "Expected Loss Ratio", value: "68.5%", benchmark: "Budget: 70.0%", status: "favorable" },
-    { label: "Risk Loading", value: "4.2%", benchmark: "Min: 3.0%", status: "adequate" }
-  ];
-
-  const [layers, setLayers] = useState([
-    { id: 1, layer: "Working Layer", limit: 5000000, retention: 0, rate: 8.5 },
-    { id: 2, layer: "1st Excess", limit: 10000000, retention: 5000000, rate: 4.2 },
-    { id: 3, layer: "2nd Excess", limit: 15000000, retention: 15000000, rate: 2.8 },
-    { id: 4, layer: "Cat Cover", limit: 50000000, retention: 30000000, rate: 1.5 }
-  ]);
-
-  const layerPremium = (layer: { limit: number; rate: number }) => Math.round(layer.limit * layer.rate / 100);
-  const totalLayerPremium = layers.reduce((sum, l) => sum + layerPremium(l), 0);
-
-  const handleAddLayer = () => {
-    const last = layers[layers.length - 1];
-    setLayers([...layers, {
-      id: Date.now(),
-      layer: `Layer ${layers.length + 1}`,
-      limit: 10000000,
-      retention: last ? last.retention + last.limit : 0,
-      rate: 1.0
-    }]);
-    toast.success("Layer added — adjust its limit and rate");
+  const typeHelp: Record<PricingTreatyType, string> = {
+    'Quota Share': 'Fixed share of every risk on the covered lines. Loss cost follows the cession.',
+    'Surplus': 'Cessions above the retained line. Priced on the estimated ceded share (no per-risk profile yet).',
+    'XOL': 'Per-risk excess of loss. Losses above the attachment, capped at the limit.',
+    'Stop Loss': 'Aggregate protection on the annual loss ratio, as % of subject premium.',
+    'Catastrophe': 'Per-event excess of loss for accumulations.',
+    'Facultative': 'One specific inward treaty priced individually.'
   };
-
-  const handleRemoveLayer = (id: number) => {
-    if (layers.length <= 1) {
-      toast.error("At least one layer is required");
-      return;
-    }
-    setLayers(layers.filter(l => l.id !== id));
-  };
-
-  const updateLayerRate = (id: number, rate: string) => {
-    setLayers(layers.map(l => l.id === id ? { ...l, rate: parseFloat(rate) || 0 } : l));
-  };
-
-  const riskFactors = [
-    { factor: "Geographic Concentration", weight: 0.15, score: 7.2, impact: "Medium" },
-    { factor: "Line of Business Mix", weight: 0.20, score: 8.5, impact: "Low" },
-    { factor: "Claims Experience", weight: 0.25, score: 6.8, impact: "High" },
-    { factor: "Market Conditions", weight: 0.20, score: 7.9, impact: "Medium" },
-    { factor: "Regulatory Environment", weight: 0.10, score: 8.2, impact: "Low" },
-    { factor: "Currency Risk", weight: 0.10, score: 6.5, impact: "Medium" }
-  ];
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">AI-Powered Pricing System</h2>
-          <p className="text-gray-600">Automated treaty and facultative pricing with machine learning</p>
+          <h2 className="text-2xl font-bold text-gray-900">Pricing System</h2>
+          <p className="text-gray-600">
+            Deterministic actuarial pricing from live portfolio data · {claims.length} claims, {treaties.length} treaties in evidence
+          </p>
         </div>
         <div className="flex space-x-2">
+          {errorCount > 0 && (
+            <Badge variant="destructive" className="self-center">
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              {errorCount} validation error{errorCount > 1 ? 's' : ''}
+            </Badge>
+          )}
           <Button variant="outline" onClick={() => setHistoryOpen(true)}>
             <FileText className="h-4 w-4 mr-2" />
-            Pricing History
+            Pricing History ({history.length})
           </Button>
-          <Button onClick={handleGeneratePricing} disabled={pricingInProgress}>
-            <Brain className="h-4 w-4 mr-2" />
-            {pricingInProgress ? 'Generating...' : 'Generate AI Pricing'}
+          <Button variant="outline" onClick={() => { exportPricingCsv(structure, output); toast.success("Pricing exercise exported as CSV"); }}>
+            <Download className="h-4 w-4 mr-2" />
+            CSV
+          </Button>
+          <Button onClick={handleExportMemo}>
+            <FileText className="h-4 w-4 mr-2" />
+            Pricing Memo (PDF)
           </Button>
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="setup">Pricing Setup</TabsTrigger>
-          <TabsTrigger value="layers">Layer Structure</TabsTrigger>
-          <TabsTrigger value="risk">Risk Analysis</TabsTrigger>
-          <TabsTrigger value="results">Pricing Results</TabsTrigger>
-          <TabsTrigger value="comparison">Market Comparison</TabsTrigger>
+      {/* Headline result */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Office Premium', value: `${structure.currency} ${fmtM(b.officePremium)}`, sub: output.selectedBasis, icon: <Calculator className="h-4 w-4" /> },
+          { label: 'Technical Premium', value: `${structure.currency} ${fmtM(b.technicalPremium)}`, sub: `Loss cost ${fmtM(b.expectedLossCost)} + risk ${assumptions.riskLoadingPct}%`, icon: <Scale className="h-4 w-4" /> },
+          { label: 'Rate on Subject', value: b.ratePct === null ? '—' : `${b.ratePct.toFixed(2)}%`, sub: `Subject premium ${fmtM(subjectPremium)}`, icon: <TrendingUp className="h-4 w-4" /> },
+          { label: 'Rate on Line', value: b.rateOnLinePct === null ? 'n/a' : `${b.rateOnLinePct.toFixed(2)}%`, sub: b.rateOnLinePct === null ? 'Proportional / aggregate basis' : `Limit ${fmtM(parseFloat(limit) || 0)}`, icon: <Scale className="h-4 w-4" /> }
+        ].map(kpi => (
+          <Card key={kpi.label}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{kpi.label}</CardTitle>
+              {kpi.icon}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{kpi.value}</div>
+              <p className="text-xs text-muted-foreground truncate" title={kpi.sub}>{kpi.sub}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Tabs defaultValue="setup" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
+          <TabsTrigger value="setup">Setup</TabsTrigger>
+          <TabsTrigger value="methods">Methods</TabsTrigger>
+          <TabsTrigger value="buildup">Premium Build-Up</TabsTrigger>
+          <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
+          <TabsTrigger value="validation">Validation</TabsTrigger>
+          <TabsTrigger value="analytics">Portfolio Analytics</TabsTrigger>
         </TabsList>
 
+        {/* ------------------------------------------------ Setup */}
         <TabsContent value="setup" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Treaty Type</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Select value={treatyType} onValueChange={setTreatyType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="quota">Quota Share</SelectItem>
-                    <SelectItem value="surplus">Surplus</SelectItem>
-                    <SelectItem value="xol">Excess of Loss</SelectItem>
-                    <SelectItem value="stoploss">Stop Loss</SelectItem>
-                    <SelectItem value="facultative">Facultative</SelectItem>
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Line of Business</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Select value={lineOfBusiness} onValueChange={setLineOfBusiness}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="motor">Motor</SelectItem>
-                    <SelectItem value="property">Property</SelectItem>
-                    <SelectItem value="marine">Marine</SelectItem>
-                    <SelectItem value="aviation">Aviation</SelectItem>
-                    <SelectItem value="liability">Liability</SelectItem>
-                    <SelectItem value="agriculture">Agriculture</SelectItem>
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Currency</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Select defaultValue="usd">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="usd">USD</SelectItem>
-                    <SelectItem value="tzs">TZS</SelectItem>
-                    <SelectItem value="kes">KES</SelectItem>
-                    <SelectItem value="ugx">UGX</SelectItem>
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Inception Date</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Input type="date" defaultValue="2025-01-01" />
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Treaty Parameters</CardTitle>
-                <CardDescription>Configure treaty structure and limits</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="retention">Retention (USD)</Label>
-                    <Input id="retention" type="number" defaultValue="500000" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="limit">Limit (USD)</Label>
-                    <Input id="limit" type="number" defaultValue="5000000" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="cession">Cession %</Label>
-                    <Input id="cession" type="number" defaultValue="50" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="commission">Commission %</Label>
-                    <Input id="commission" type="number" defaultValue="25" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>AI Configuration</CardTitle>
-                <CardDescription>Machine learning pricing parameters</CardDescription>
+                <CardTitle>Deal Structure</CardTitle>
+                <CardDescription>{typeHelp[treatyType]}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>AI Confidence Level: {aiConfidence[0]}%</Label>
-                  <Slider
-                    value={aiConfidence}
-                    onValueChange={setAiConfidence}
-                    max={100}
-                    min={50}
-                    step={5}
-                    className="w-full"
-                  />
+                  <Label>Arrangement Type</Label>
+                  <Select value={treatyType} onValueChange={(v) => setTreatyType(v as PricingTreatyType)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {TREATY_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+
+                {treatyType === 'Facultative' ? (
                   <div className="space-y-2">
-                    <Label htmlFor="years">Experience Years</Label>
-                    <Select defaultValue="5">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                    <Label>Inward Treaty Being Priced *</Label>
+                    <Select value={linkedTreatyId} onValueChange={setLinkedTreatyId}>
+                      <SelectTrigger><SelectValue placeholder="Select the treaty" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="3">3 Years</SelectItem>
-                        <SelectItem value="5">5 Years</SelectItem>
-                        <SelectItem value="10">10 Years</SelectItem>
+                        {treaties.map(t => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.treatyName} ({t.contractNumber}) — {t.lineOfBusiness.join(', ')}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
+                ) : (
                   <div className="space-y-2">
-                    <Label htmlFor="trend">Trend Factor %</Label>
-                    <Input id="trend" type="number" step="0.1" defaultValue="2.5" />
+                    <Label>Lines of Business * <span className="text-xs text-muted-foreground font-normal">(experience and exposure come from these lines)</span></Label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 border rounded-lg p-3">
+                      {portfolioLobs.map(lob => (
+                        <div key={lob} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`plob-${lob}`}
+                            checked={selectedLobs.includes(lob)}
+                            onCheckedChange={(checked) => setSelectedLobs(prev =>
+                              checked ? [...prev, lob] : prev.filter(l => l !== lob))}
+                          />
+                          <Label htmlFor={`plob-${lob}`} className="text-sm font-normal">{lob}</Label>
+                        </div>
+                      ))}
+                      {portfolioLobs.length === 0 && <p className="text-sm text-muted-foreground col-span-3">No inward treaties yet.</p>}
+                    </div>
+                  </div>
+                )}
+
+                {(selectedLobs.length > 0 || linkedTreatyId) && (
+                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 text-sm">
+                    <p className="font-medium">
+                      {scopeTreaties.length} treat{scopeTreaties.length === 1 ? 'y' : 'ies'} in scope · derived subject premium {structure.currency} {fmt(derivedSubjectPremium)}
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Subject Premium Override <span className="text-xs text-muted-foreground font-normal">(leave blank to use the derived figure)</span></Label>
+                  <Input type="number" value={subjectPremiumOverride}
+                    onChange={(e) => setSubjectPremiumOverride(e.target.value)}
+                    placeholder={derivedSubjectPremium > 0 ? fmt(derivedSubjectPremium) : 'e.g. 25000000'} />
+                </div>
+
+                {/* Type-specific structure */}
+                {(treatyType === 'Quota Share' || treatyType === 'Surplus') && (
+                  <div className="space-y-2">
+                    <Label>{treatyType === 'Surplus' ? 'Estimated Ceded Share % *' : 'Cession % *'}</Label>
+                    <Input type="number" step="0.5" value={cessionPct} onChange={(e) => setCessionPct(e.target.value)} placeholder="25" />
+                  </div>
+                )}
+                {(treatyType === 'XOL' || treatyType === 'Catastrophe' || treatyType === 'Facultative') && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Attachment *</Label>
+                      <Input type="number" value={attachment} onChange={(e) => setAttachment(e.target.value)} placeholder="2000000" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Limit *</Label>
+                      <Input type="number" value={limit} onChange={(e) => setLimit(e.target.value)} placeholder="8000000" />
+                    </div>
+                  </div>
+                )}
+                {treatyType === 'Stop Loss' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Attachment Loss Ratio % *</Label>
+                      <Input type="number" step="5" value={lrAttachPct} onChange={(e) => setLrAttachPct(e.target.value)} placeholder="80" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Exhaustion Loss Ratio % *</Label>
+                      <Input type="number" step="5" value={lrExhaustPct} onChange={(e) => setLrExhaustPct(e.target.value)} placeholder="120" />
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Pricing Assumptions</CardTitle>
+                <CardDescription>Persisted across sessions — every figure recomputes as you type</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Claims Inflation % p.a.</Label>
+                    <Input type="number" step="0.5" value={assumptions.claimsInflationPct}
+                      onChange={(e) => setAssumption('claimsInflationPct', parseFloat(e.target.value) || 0)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Premium Trend % p.a.</Label>
+                    <Input type="number" step="0.5" value={assumptions.premiumTrendPct}
+                      onChange={(e) => setAssumption('premiumTrendPct', parseFloat(e.target.value) || 0)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Expected Loss Ratio % (prior)</Label>
+                    <Input type="number" step="1" value={assumptions.expectedLossRatioPct}
+                      onChange={(e) => setAssumption('expectedLossRatioPct', parseFloat(e.target.value) || 0)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Risk Loading %</Label>
+                    <Input type="number" step="1" value={assumptions.riskLoadingPct}
+                      onChange={(e) => setAssumption('riskLoadingPct', parseFloat(e.target.value) || 0)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Expense Loading %</Label>
+                    <Input type="number" step="0.5" value={assumptions.expenseLoadingPct}
+                      onChange={(e) => setAssumption('expenseLoadingPct', parseFloat(e.target.value) || 0)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Commission Loading %</Label>
+                    <Input type="number" step="0.5" value={assumptions.commissionLoadingPct}
+                      onChange={(e) => setAssumption('commissionLoadingPct', parseFloat(e.target.value) || 0)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Profit Loading %</Label>
+                    <Input type="number" step="0.5" value={assumptions.profitLoadingPct}
+                      onChange={(e) => setAssumption('profitLoadingPct', parseFloat(e.target.value) || 0)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Full-Credibility Claims</Label>
+                    <Input type="number" step="5" value={assumptions.fullCredibilityClaims}
+                      onChange={(e) => setAssumption('fullCredibilityClaims', parseFloat(e.target.value) || 1)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Exposure Curve Exponent</Label>
+                    <Input type="number" step="0.1" value={assumptions.exposureCurveExponent}
+                      onChange={(e) => setAssumption('exposureCurveExponent', parseFloat(e.target.value) || 1)} />
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Badge className="bg-green-100 text-green-800">
-                    <Zap className="h-3 w-3 mr-1" />
-                    AI Model Active
-                  </Badge>
-                  <Badge variant="outline">Last Updated: 2 hours ago</Badge>
-                </div>
+                <Button size="sm" variant="outline" onClick={() => { setAssumptions(DEFAULT_PRICING_ASSUMPTIONS); toast.info("Assumptions reset to defaults"); }}>
+                  Reset to defaults
+                </Button>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="layers">
+        {/* ------------------------------------------------ Methods */}
+        <TabsContent value="methods" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Multi-Layer Structure</CardTitle>
-              <CardDescription>Configure multiple treaty layers with automatic pricing</CardDescription>
+              <CardTitle>Method Comparison</CardTitle>
+              <CardDescription>Five deterministic methods on the same structure — the credibility blend below drives the premium</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-medium">Layer Configuration</h4>
-                  <Button size="sm" variant="outline" onClick={handleAddLayer}>
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add Layer
-                  </Button>
-                </div>
-                
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-2">Layer</th>
-                        <th className="text-left p-2">Limit</th>
-                        <th className="text-left p-2">Retention</th>
-                        <th className="text-left p-2">Rate %</th>
-                        <th className="text-left p-2">Premium</th>
-                        <th className="text-left p-2">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {layers.map((layer) => (
-                        <tr key={layer.id} className="border-b">
-                          <td className="p-2">
-                            <Badge variant="outline">{layer.layer}</Badge>
-                          </td>
-                          <td className="p-2">{layer.limit.toLocaleString()}</td>
-                          <td className="p-2">{layer.retention.toLocaleString()}</td>
-                          <td className="p-2">
-                            <Input
-                              type="number"
-                              step="0.1"
-                              value={layer.rate}
-                              onChange={(e) => updateLayerRate(layer.id, e.target.value)}
-                              className="w-20"
-                            />
-                          </td>
-                          <td className="p-2 font-medium">{layerPremium(layer).toLocaleString()}</td>
-                          <td className="p-2">
-                            <Button size="sm" variant="ghost" onClick={() => handleRemoveLayer(layer.id)}>
-                              <Trash2 className="h-3 w-3 mr-1" />
-                              Remove
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-sm text-blue-600">Total Premium</p>
-                      <p className="text-xl font-bold text-blue-900">USD {(totalLayerPremium / 1000000).toFixed(3)}M</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-blue-600">Weighted Rate</p>
-                      <p className="text-xl font-bold text-blue-900">4.03%</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-blue-600">Total Capacity</p>
-                      <p className="text-xl font-bold text-blue-900">USD 80M</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-blue-600">ROE Target</p>
-                      <p className="text-xl font-bold text-blue-900">15.2%</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="risk">
-          <Card>
-            <CardHeader>
-              <CardTitle>AI Risk Assessment</CardTitle>
-              <CardDescription>Machine learning risk factor analysis and scoring</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-red-50 p-4 rounded-lg">
-                    <p className="text-sm text-red-600 font-medium">Overall Risk Score</p>
-                    <p className="text-3xl font-bold text-red-900">7.2</p>
-                    <p className="text-xs text-red-600">Medium Risk Profile</p>
-                  </div>
-                  <div className="bg-yellow-50 p-4 rounded-lg">
-                    <p className="text-sm text-yellow-600 font-medium">Volatility Index</p>
-                    <p className="text-3xl font-bold text-yellow-900">6.8</p>
-                    <p className="text-xs text-yellow-600">Above Average</p>
-                  </div>
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <p className="text-sm text-green-600 font-medium">Stability Score</p>
-                    <p className="text-3xl font-bold text-green-900">8.1</p>
-                    <p className="text-xs text-green-600">Good Stability</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="font-medium">Risk Factor Breakdown</h4>
-                  {riskFactors.map((factor, index) => (
-                    <div key={index} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="font-medium">{factor.factor}</span>
-                        <Badge variant={factor.impact === 'High' ? 'destructive' : factor.impact === 'Medium' ? 'default' : 'secondary'}>
-                          {factor.impact} Impact
-                        </Badge>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <div className="flex-1">
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full" 
-                              style={{ width: `${factor.score * 10}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                        <span className="text-sm font-medium w-12">{factor.score}/10</span>
-                        <span className="text-sm text-gray-500 w-16">{(factor.weight * 100).toFixed(0)}% weight</span>
-                      </div>
-                    </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Method</TableHead>
+                    <TableHead className="text-right">Loss Cost</TableHead>
+                    <TableHead className="text-right">Rate %</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Basis</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {output.methods.map(m => (
+                    <TableRow key={m.method}>
+                      <TableCell className="font-medium">{PRICING_METHOD_LABELS[m.method]}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(m.lossCost)}</TableCell>
+                      <TableCell className="text-right font-mono">{m.lossCostRatePct?.toFixed(2) ?? '—'}</TableCell>
+                      <TableCell>
+                        {m.usable
+                          ? <Badge variant="secondary"><CheckCircle className="h-3 w-3 mr-1" />Usable</Badge>
+                          : <Badge variant="outline">Insufficient data</Badge>}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-96">{m.note}</TableCell>
+                    </TableRow>
                   ))}
-                </div>
+                </TableBody>
+              </Table>
+
+              <div className="mt-4 rounded-lg bg-blue-50 dark:bg-blue-950 p-4 space-y-1">
+                <p className="font-medium text-sm">Credibility Blend — {fmt(output.blend.blendedLossCost)}</p>
+                <p className="text-xs text-muted-foreground">{output.blend.note}</p>
+                <p className="text-xs text-muted-foreground">
+                  Experience side {fmt(output.blend.experienceLossCost)} · Exposure prior {fmt(output.blend.priorLossCost)} · {output.blend.claimCount} claims in scope
+                </p>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Trended Experience</CardTitle>
+              <CardDescription>
+                Losses inflated at {assumptions.claimsInflationPct}% p.a., premiums trended at {assumptions.premiumTrendPct}% p.a., mapped into the priced structure
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {output.experience.length === 0 ? (
+                <p className="text-center text-muted-foreground py-6">No experience in scope — select lines of business with claims history.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Year</TableHead>
+                      <TableHead className="text-right">Trended Premium</TableHead>
+                      <TableHead className="text-right">Trended Gross Losses</TableHead>
+                      <TableHead className="text-right">Losses in Structure</TableHead>
+                      <TableHead className="text-right">Claims</TableHead>
+                      <TableHead className="text-right">Loss Ratio</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {output.experience.map(e => (
+                      <TableRow key={e.year}>
+                        <TableCell className="font-medium">{e.year}</TableCell>
+                        <TableCell className="text-right font-mono">{fmt(e.premium)}</TableCell>
+                        <TableCell className="text-right font-mono">{fmt(e.losses)}</TableCell>
+                        <TableCell className="text-right font-mono">{fmt(e.lossesInStructure)}</TableCell>
+                        <TableCell className="text-right">{e.claimCount}</TableCell>
+                        <TableCell className="text-right font-mono">{e.lossRatioPct === null ? '—' : `${e.lossRatioPct.toFixed(1)}%`}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="results">
+        {/* ------------------------------------------------ Premium build-up */}
+        <TabsContent value="buildup" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Pricing Results</CardTitle>
-              <CardDescription>AI-generated pricing recommendations</CardDescription>
+              <CardTitle>Technical → Office Premium</CardTitle>
+              <CardDescription>Loadings are percentages of the office premium (standard division method)</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {pricingMetrics.map((metric, index) => (
-                    <div key={index} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-sm font-medium">{metric.label}</span>
-                        <Badge 
-                          variant={metric.status === 'optimal' ? 'default' : metric.status === 'favorable' ? 'secondary' : 'outline'}
-                        >
-                          {metric.status}
-                        </Badge>
-                      </div>
-                      <p className="text-2xl font-bold">{metric.value}</p>
-                      <p className="text-xs text-gray-500">{metric.benchmark}</p>
-                    </div>
+              <Table>
+                <TableBody>
+                  {([
+                    ['Expected loss cost (credibility blend)', b.expectedLossCost, false],
+                    [`Risk loading (${assumptions.riskLoadingPct}% of loss cost)`, b.riskLoading, false],
+                    ['Technical premium', b.technicalPremium, true],
+                    [`Expense loading (${assumptions.expenseLoadingPct}%)`, b.expenseLoading, false],
+                    [`Commission loading (${assumptions.commissionLoadingPct}%)`, b.commissionLoading, false],
+                    [`Profit loading (${assumptions.profitLoadingPct}%)`, b.profitLoading, false],
+                    ['Office premium', b.officePremium, true]
+                  ] as Array<[string, number, boolean]>).map(([label, value, emphasis]) => (
+                    <TableRow key={label} className={emphasis ? 'font-bold border-t-2' : ''}>
+                      <TableCell>{label}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(value)}</TableCell>
+                    </TableRow>
                   ))}
+                </TableBody>
+              </Table>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4 text-sm">
+                <div className="border rounded-lg p-3">
+                  <p className="text-muted-foreground">Rate on subject premium</p>
+                  <p className="font-bold text-lg">{b.ratePct === null ? '—' : `${b.ratePct.toFixed(2)}%`}</p>
                 </div>
-
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg">
-                  <h4 className="font-medium text-gray-900 mb-4">AI Recommendation Summary</h4>
-                  <div className="space-y-2">
-                    <p className="text-sm">
-                      <span className="font-medium text-green-600">✓ Recommended:</span> The AI model suggests proceeding with this pricing structure based on {aiConfidence[0]}% confidence level.
-                    </p>
-                    <p className="text-sm">
-                      <span className="font-medium text-blue-600">→ Key Factors:</span> Strong claims experience, stable market conditions, and appropriate risk loading support this pricing.
-                    </p>
-                    <p className="text-sm">
-                      <span className="font-medium text-orange-600">⚠ Watch:</span> Monitor geographic concentration and currency fluctuations for potential adjustments.
-                    </p>
-                  </div>
+                <div className="border rounded-lg p-3">
+                  <p className="text-muted-foreground">Rate on line</p>
+                  <p className="font-bold text-lg">{b.rateOnLinePct === null ? 'n/a' : `${b.rateOnLinePct.toFixed(2)}%`}</p>
                 </div>
-
-                <div className="flex space-x-4">
-                  <Button className="flex-1" onClick={handleAcceptPricing}>
-                    <Target className="h-4 w-4 mr-2" />
-                    Accept AI Pricing
-                  </Button>
-                  <Button variant="outline" className="flex-1" onClick={() => setActiveTab("setup")}>
-                    Modify Parameters
-                  </Button>
-                  <Button variant="outline" onClick={handleExportPricingReport}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Export Report
-                  </Button>
+                <div className="border rounded-lg p-3">
+                  <p className="text-muted-foreground">Total loadings</p>
+                  <p className="font-bold text-lg">{b.loadingsSumPct.toFixed(1)}% of office</p>
                 </div>
+              </div>
+              <div className="flex space-x-2 mt-4">
+                <Button onClick={() => handleSavePricing('Quoted')}>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save as Quoted
+                </Button>
+                <Button variant="outline" onClick={() => handleSavePricing('Draft')}>
+                  Save as Draft
+                </Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="comparison">
+        {/* ------------------------------------------------ Scenarios */}
+        <TabsContent value="scenarios" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Market Comparison</CardTitle>
-              <CardDescription>Benchmark against market rates and competitor pricing</CardDescription>
+              <CardTitle>Scenario Modelling</CardTitle>
+              <CardDescription>Standard stresses re-run through the full pricing pipeline</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Scenario</TableHead>
+                    <TableHead className="text-right">Loss Shock</TableHead>
+                    <TableHead className="text-right">Inflation Shift</TableHead>
+                    <TableHead className="text-right">Retention Shift</TableHead>
+                    <TableHead className="text-right">Office Premium</TableHead>
+                    <TableHead className="text-right">vs Base</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {scenarios.map(s => (
+                    <TableRow key={s.id} className={s.name === 'Base' ? 'font-medium' : ''}>
+                      <TableCell>{s.name}</TableCell>
+                      <TableCell className="text-right">{s.lossShockPct ? `+${s.lossShockPct}%` : '—'}</TableCell>
+                      <TableCell className="text-right">{s.inflationShiftPct ? `+${s.inflationShiftPct}%` : '—'}</TableCell>
+                      <TableCell className="text-right">{s.structureShiftPct ? `+${s.structureShiftPct}%` : '—'}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(s.officePremium)}</TableCell>
+                      <TableCell className={`text-right font-mono ${(s.deltaVsBasePct ?? 0) > 0 ? 'text-red-600' : (s.deltaVsBasePct ?? 0) < 0 ? 'text-green-600' : ''}`}>
+                        {s.deltaVsBasePct === null || s.name === 'Base' ? '—' : `${s.deltaVsBasePct >= 0 ? '+' : ''}${s.deltaVsBasePct.toFixed(1)}%`}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={scenarios.map(s => ({ name: s.name.length > 22 ? s.name.slice(0, 22) + '…' : s.name, 'Office Premium': Math.round(s.officePremium) }))}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tickFormatter={(v) => `${(v / 1_000_000).toFixed(1)}M`} />
+                  <ChartTooltip formatter={(v: number) => fmt(v)} />
+                  <Legend />
+                  <Bar dataKey="Office Premium" fill="#2563eb" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------ Validation */}
+        <TabsContent value="validation" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pricing Validation</CardTitle>
+              <CardDescription>Structure, loadings, rate sanity, and data sufficiency — evaluated live</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {issues.length === 0 ? (
+                <div className="flex items-start space-x-2 p-3 rounded-lg bg-green-50 dark:bg-green-950">
+                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                  <p className="text-sm">All pricing validations pass.</p>
+                </div>
+              ) : issues.map((issue, i) => (
+                <div key={i} className={`flex items-start space-x-2 p-3 rounded-lg ${issue.severity === 'error' ? 'bg-red-50 dark:bg-red-950' : 'bg-amber-50 dark:bg-amber-950'}`}>
+                  <AlertTriangle className={`h-4 w-4 mt-0.5 shrink-0 ${issue.severity === 'error' ? 'text-red-600' : 'text-amber-600'}`} />
+                  <div>
+                    <p className="text-sm">{issue.message}</p>
+                    <p className="text-xs text-muted-foreground">{issue.severity}</p>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------ Portfolio analytics */}
+        <TabsContent value="analytics" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Portfolio Rate Adequacy</CardTitle>
+              <CardDescription>
+                Booked premium vs the premium the current basis would require (max of incurred and ELR losses, grossed up for loadings)
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2">Our Pricing</h4>
-                    <p className="text-2xl font-bold text-blue-600">15.8%</p>
-                    <p className="text-sm text-gray-500">Commercial Rate</p>
-                  </div>
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2">Market Average</h4>
-                    <p className="text-2xl font-bold text-gray-600">16.2%</p>
-                    <p className="text-sm text-gray-500">Industry Benchmark</p>
-                  </div>
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2">Competitive Edge</h4>
-                    <p className="text-2xl font-bold text-green-600">-0.4%</p>
-                    <p className="text-sm text-gray-500">Below Market</p>
-                  </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Line of Business</TableHead>
+                    <TableHead className="text-right">Treaties</TableHead>
+                    <TableHead className="text-right">Booked Premium</TableHead>
+                    <TableHead className="text-right">Incurred Losses</TableHead>
+                    <TableHead className="text-right">Actual LR</TableHead>
+                    <TableHead className="text-right">Required Premium</TableHead>
+                    <TableHead className="text-right">Adequacy</TableHead>
+                    <TableHead>Verdict</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {adequacy.map(a => (
+                    <TableRow key={a.lineOfBusiness}>
+                      <TableCell className="font-medium">{a.lineOfBusiness}</TableCell>
+                      <TableCell className="text-right">{a.treatyCount}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(a.bookedPremium)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(a.incurredLosses)}</TableCell>
+                      <TableCell className="text-right font-mono">{a.actualLossRatioPct === null ? '—' : `${a.actualLossRatioPct.toFixed(1)}%`}</TableCell>
+                      <TableCell className="text-right font-mono">{fmt(a.requiredPremium)}</TableCell>
+                      <TableCell className="text-right font-mono">{a.adequacyPct === null ? '—' : `${a.adequacyPct.toFixed(0)}%`}</TableCell>
+                      <TableCell>
+                        <Badge variant={a.verdict === 'Adequate' ? 'secondary' : a.verdict === 'Marginal' ? 'default' : a.verdict === 'Inadequate' ? 'destructive' : 'outline'}>
+                          {a.verdict}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {adequacy.length > 0 && (
+                <div className="mt-4">
+                  <ResponsiveContainer width="100%" height={240}>
+                    <BarChart data={adequacy.map(a => ({ name: a.lineOfBusiness, Booked: Math.round(a.bookedPremium), Required: Math.round(a.requiredPremium) }))}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis tickFormatter={(v) => `${(v / 1_000_000).toFixed(0)}M`} />
+                      <ChartTooltip formatter={(v: number) => fmt(v)} />
+                      <Legend />
+                      <Bar dataKey="Booked" fill="#2563eb" />
+                      <Bar dataKey="Required" fill="#dc2626" />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium mb-3">Market Intelligence</h4>
-                  <div className="space-y-2 text-sm">
-                    <p>• Motor rates in East Africa have stabilized at 15-17% range</p>
-                    <p>• Swiss Re's latest pricing for similar portfolios: 16.5%</p>
-                    <p>• Local reinsurers are pricing at 15.5-16.8% range</p>
-                    <p>• Recent large losses have pushed market rates up by 0.5%</p>
-                  </div>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Pricing History Dialog */}
+      {/* Pricing history dialog */}
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Pricing History</DialogTitle>
-            <DialogDescription>AI pricing runs recorded during this session</DialogDescription>
+            <DialogDescription>Saved pricing exercises (persisted)</DialogDescription>
           </DialogHeader>
-          {pricingHistory.length > 0 ? (
+          {history.length > 0 ? (
             <div className="space-y-2 max-h-80 overflow-y-auto">
-              {pricingHistory.slice().reverse().map((entry, index) => (
-                <div key={index} className="flex items-center justify-between border rounded-lg p-3 text-sm">
+              {[...history].reverse().map(r => (
+                <div key={r.id} className="flex items-center justify-between border rounded-lg p-3 text-sm">
                   <div>
-                    <p className="font-medium capitalize">{entry.treatyType} — {entry.lineOfBusiness}</p>
-                    <p className="text-muted-foreground text-xs">{entry.date}</p>
+                    <p className="font-medium">{r.treatyType} — {r.linesOfBusiness.join(', ') || 'linked treaty'}</p>
+                    <p className="text-muted-foreground text-xs">{new Date(r.date).toLocaleString()} · {r.selectedBasis}</p>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="outline">{entry.confidence}% confidence</Badge>
-                    <Badge variant={entry.outcome === 'Accepted' ? 'secondary' : 'outline'}>{entry.outcome}</Badge>
+                  <div className="text-right">
+                    <p className="font-mono font-medium">{fmt(r.officePremium)}</p>
+                    <Badge variant={r.outcome === 'Bound' ? 'secondary' : r.outcome === 'Declined' ? 'destructive' : 'outline'}>{r.outcome}</Badge>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              <p>No pricing runs recorded yet.</p>
-              <p className="text-sm">Use "Generate AI Pricing" to create your first pricing run.</p>
+              <p>No saved pricings yet.</p>
+              <p className="text-sm">Price a structure and save it from the Premium Build-Up tab.</p>
             </div>
           )}
         </DialogContent>

@@ -15,6 +15,13 @@ Bornhuetter-Ferguson / Cape Cod / Expected Loss Ratio, simplified Mack standard 
 inflation/trend adjustment, diagnostics, XOL analytics, portfolio analytics, charts,
 and exports. Actuary-selectable preferred method.
 
+### Stage 6A — Enterprise Traditional Pricing Engine ✅
+Deterministic actuarial pricing workstation on `src/pricing/`: burning cost,
+experience/exposure rating, frequency–severity, ELR, credibility blending,
+technical→office premium build-up, scenario modelling, validation, and
+portfolio rate adequacy — all from live data. Replaces the mock AI screen.
+**Stage 6B (Explainable AI augmentation) is next.**
+
 ### Stage 5 — Enterprise Retrocession Management Platform ✅
 Rebuilt Retrocession on `src/retrocession/` engines: typed programmes with layers
 and placements, automatic recovery calculation from live claims, retro claims

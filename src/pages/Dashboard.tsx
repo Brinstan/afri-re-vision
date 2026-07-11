@@ -260,7 +260,7 @@ const Dashboard = () => {
               { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="h-4 w-4" /> },
               { id: 'underwriting', label: 'Underwriting', icon: <Building className="h-4 w-4" /> },
               { id: 'actuarial', label: 'Actuarial Engine', icon: <Calculator className="h-4 w-4" /> },
-              { id: 'pricing', label: 'AI Pricing', icon: <TrendingUp className="h-4 w-4" /> },
+              { id: 'pricing', label: 'Pricing', icon: <TrendingUp className="h-4 w-4" /> },
               { id: 'accounting', label: 'Accounting', icon: <DollarSign className="h-4 w-4" /> },
               { id: 'claims', label: 'Claims', icon: <FileText className="h-4 w-4" /> },
               { id: 'treaties', label: 'Treaties', icon: <Users className="h-4 w-4" /> },
