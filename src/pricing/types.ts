@@ -18,6 +18,9 @@ export interface PricingStructure {
   lrExhaustPct?: number;
   // Facultative
   linkedTreatyId?: string;
+  // Cedant recall: restrict experience to one cedant and/or contract number
+  cedant?: string;
+  contractNumber?: string;
 }
 
 export interface PricingAssumptions {

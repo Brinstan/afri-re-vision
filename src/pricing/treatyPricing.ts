@@ -2,7 +2,7 @@
 // credibility-blends experience against the exposure prior, and builds the
 // office premium. One entry point for all six arrangement types.
 
-import type { Claim, Treaty } from '@/components/DataStore';
+import type { Claim, ExternalExperienceRow, Treaty } from '@/components/DataStore';
 import { buildExperience, burningCost, experienceRating } from './burningCost';
 import { exposureRating } from './exposureRating';
 import { frequencySeverity } from './frequencySeverity';
@@ -25,14 +25,15 @@ export const priceStructure = (
   claims: Claim[],
   treaties: Treaty[],
   structure: PricingStructure,
-  assumptions: PricingAssumptions
+  assumptions: PricingAssumptions,
+  externalRows: ExternalExperienceRow[] = []
 ): PricingOutput => {
-  const experience = buildExperience(claims, treaties, structure, assumptions);
+  const experience = buildExperience(claims, treaties, structure, assumptions, externalRows);
 
   const bc = burningCost(experience, structure);
   const exp = experienceRating(experience, structure);
-  const expo = exposureRating(claims, treaties, structure, assumptions);
-  const fs = frequencySeverity(claims, treaties, structure, assumptions);
+  const expo = exposureRating(claims, treaties, structure, assumptions, externalRows);
+  const fs = frequencySeverity(claims, treaties, structure, assumptions, externalRows);
 
   const elrLossCost = structure.subjectPremium * assumptions.expectedLossRatioPct / 100 *
     (structure.treatyType === 'Quota Share' || structure.treatyType === 'Surplus'

@@ -8,8 +8,9 @@
 // simplification of market exposure curves (no per-risk sum-insured profile
 // exists in the data model).
 
-import type { Claim, Treaty } from '@/components/DataStore';
+import type { Claim, ExternalExperienceRow, Treaty } from '@/components/DataStore';
 import { claimIncurred, inflate } from '@/lib/actuarial';
+import { explodeLosses, scopeExternalRows } from './externalData';
 import { MethodResult, PricingAssumptions, PricingStructure } from './types';
 
 const exposureCurve = (x: number, c: number): number =>
@@ -19,7 +20,8 @@ export const exposureRating = (
   claims: Claim[],
   treaties: Treaty[],
   structure: PricingStructure,
-  assumptions: PricingAssumptions
+  assumptions: PricingAssumptions,
+  externalRows: ExternalExperienceRow[] = []
 ): MethodResult => {
   const expectedGroundUp = structure.subjectPremium * assumptions.expectedLossRatioPct / 100;
 
@@ -68,7 +70,9 @@ export const exposureRating = (
       const maxLoss = Math.max(
         att + lim,
         ...claims.filter(c => scopeTreatyIds.has(c.treatyId))
-          .map(c => inflate(claimIncurred(c), new Date(c.dateOfLoss).getFullYear(), assumptions.claimsInflationPct))
+          .map(c => inflate(claimIncurred(c), new Date(c.dateOfLoss).getFullYear(), assumptions.claimsInflationPct)),
+        ...scopeExternalRows(externalRows, structure)
+          .flatMap(row => explodeLosses(row).map(loss => inflate(loss, row.year, assumptions.claimsInflationPct)))
       );
       const c = assumptions.exposureCurveExponent;
       const layerShare = exposureCurve((att + lim) / maxLoss, c) - exposureCurve(att / maxLoss, c);

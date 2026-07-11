@@ -1,16 +1,18 @@
 // Frequency–severity pricing: expected claim count × expected severity in the
 // priced structure, from trended historical claims.
 
-import type { Claim, Treaty } from '@/components/DataStore';
+import type { Claim, ExternalExperienceRow, Treaty } from '@/components/DataStore';
 import { claimIncurred, inflate } from '@/lib/actuarial';
 import { lossToStructure } from './burningCost';
+import { explodeLosses, scopeExternalRows } from './externalData';
 import { MethodResult, PricingAssumptions, PricingStructure } from './types';
 
 export const frequencySeverity = (
   claims: Claim[],
   treaties: Treaty[],
   structure: PricingStructure,
-  assumptions: PricingAssumptions
+  assumptions: PricingAssumptions,
+  externalRows: ExternalExperienceRow[] = []
 ): MethodResult => {
   if (structure.treatyType === 'Stop Loss') {
     return { method: 'frequencySeverity', lossCost: 0, lossCostRatePct: null, note: 'Not applicable to aggregate covers — use burning cost / exposure', usable: false };
@@ -29,6 +31,13 @@ export const frequencySeverity = (
       trended: inflate(claimIncurred(c), new Date(c.dateOfLoss).getFullYear(), assumptions.claimsInflationPct)
     }))
     .filter(x => !isNaN(x.year) && x.trended > 0);
+
+  // Imported experience contributes average-severity synthetic losses
+  scopeExternalRows(externalRows, structure).forEach(row => {
+    explodeLosses(row).forEach(loss => {
+      scoped.push({ year: row.year, trended: inflate(loss, row.year, assumptions.claimsInflationPct) });
+    });
+  });
 
   if (scoped.length === 0) {
     return { method: 'frequencySeverity', lossCost: 0, lossCostRatePct: null, note: 'No claims in scope', usable: false };

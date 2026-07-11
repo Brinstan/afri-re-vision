@@ -1,6 +1,6 @@
 // Scenario modelling: stress the pricing basis and compare office premiums.
 
-import type { Claim, Treaty } from '@/components/DataStore';
+import type { Claim, ExternalExperienceRow, Treaty } from '@/components/DataStore';
 import { priceStructure } from './treatyPricing';
 import { PricingAssumptions, PricingScenario, PricingStructure } from './types';
 
@@ -24,9 +24,10 @@ export const runScenarios = (
   treaties: Treaty[],
   structure: PricingStructure,
   assumptions: PricingAssumptions,
+  externalRows: ExternalExperienceRow[] = [],
   specs: ScenarioSpec[] = STANDARD_SCENARIOS
 ): PricingScenario[] => {
-  const base = priceStructure(claims, treaties, structure, assumptions).buildUp.officePremium;
+  const base = priceStructure(claims, treaties, structure, assumptions, externalRows).buildUp.officePremium;
 
   return specs.map((spec, i) => {
     const shockedAssumptions: PricingAssumptions = {
@@ -42,7 +43,7 @@ export const runScenarios = (
         ? structure.lrAttachPct * (1 + spec.structureShiftPct / 100)
         : undefined
     };
-    const repriced = priceStructure(claims, treaties, shockedStructure, shockedAssumptions);
+    const repriced = priceStructure(claims, treaties, shockedStructure, shockedAssumptions, externalRows);
     const officePremium = repriced.buildUp.officePremium * (1 + spec.lossShockPct / 100);
     return {
       id: `sc-${i}`,

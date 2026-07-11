@@ -28,6 +28,8 @@ None of these block current functionality; they matter for productionisation.
 | 32 | Exposure rating uses a one-parameter power curve on an MPL proxy, not market exposure curves (no per-risk sum-insured profile) | `pricing/exposureRating.ts` |
 | 33 | Stop-loss exposure rating is a deterministic excess over the ELR — no aggregate loss distribution/volatility model | `pricing/exposureRating.ts` |
 | 34 | Surplus pricing relies on a user-estimated ceded share (same per-risk data gap as #29) | `pricing/treatyPricing.ts` |
+| 35 | Experience import accepts CSV only — native .xlsx parsing needs a library (SheetJS); Excel users must Save As CSV | `pricing/externalData.ts` |
+| 36 | Imported aggregate losses are exploded at average severity per year/row — individual large losses in imports are smoothed, understating XOL layer costs for skewed years | `pricing/externalData.ts` |
 
 ## Calculation simplifications (intentional, documented)
 

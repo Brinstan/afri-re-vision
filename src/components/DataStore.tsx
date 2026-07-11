@@ -214,6 +214,19 @@ export interface RetroClaim {
   notes?: string;
 }
 
+/** Imported historical experience (from CSV/Excel) used by the Pricing System. */
+export interface ExternalExperienceRow {
+  id: string;
+  source: string;                  // file name it came from
+  year: number;
+  cedant: string;
+  contractNumber: string;
+  lineOfBusiness: string;
+  premium: number;
+  losses: number;                  // aggregate incurred losses for the year/row
+  claimCount: number;
+}
+
 export interface AuditEntry {
   id: string;
   timestamp: string;
@@ -237,6 +250,7 @@ interface DataStore {
   retroProgrammes: RetroProgramme[];
   retroClaims: RetroClaim[];
   retrocessionaires: Retrocessionaire[];
+  externalExperience: ExternalExperienceRow[];
 
   // Treaty actions
   addTreaty: (treaty: Treaty) => void;
@@ -275,6 +289,10 @@ interface DataStore {
   addRetrocessionaire: (counterparty: Retrocessionaire) => void;
   updateRetrocessionaire: (id: string, updates: Partial<Retrocessionaire>) => void;
 
+  // External experience (pricing imports)
+  importExternalExperience: (rows: ExternalExperienceRow[], source: string) => void;
+  clearExternalExperience: () => void;
+
   // Audit trail
   logAudit: (entry: Omit<AuditEntry, 'id' | 'timestamp' | 'user'>) => void;
 
@@ -296,7 +314,8 @@ const auditEntry = (entry: Omit<AuditEntry, 'id' | 'timestamp' | 'user'>): Audit
   ...entry
 });
 
-const initialData: Pick<DataStore, 'treaties' | 'claims' | 'underwritingContracts' | 'investments' | 'bankAccounts' | 'manualJournals' | 'auditLog' | 'retroProgrammes' | 'retroClaims' | 'retrocessionaires'> = {
+const initialData: Pick<DataStore, 'treaties' | 'claims' | 'underwritingContracts' | 'investments' | 'bankAccounts' | 'manualJournals' | 'auditLog' | 'retroProgrammes' | 'retroClaims' | 'retrocessionaires' | 'externalExperience'> = {
+  externalExperience: [],
   treaties: [
     {
       id: '1',
@@ -749,6 +768,23 @@ export const useDataStore = create<DataStore>()(persist((set, get) => ({
     auditLog: [...state.auditLog, auditEntry({
       action: 'UPDATE', entity: 'Retrocessionaire', entityId: id,
       sourceModule: 'Retrocession', newValue: Object.keys(updates).join(', ')
+    })]
+  })),
+
+  // External experience (pricing imports)
+  importExternalExperience: (rows, source) => set((state) => ({
+    externalExperience: [...state.externalExperience, ...rows],
+    auditLog: [...state.auditLog, auditEntry({
+      action: 'IMPORT', entity: 'ExternalExperience', entityId: source,
+      sourceModule: 'Pricing', newValue: `${rows.length} experience rows imported`
+    })]
+  })),
+
+  clearExternalExperience: () => set((state) => ({
+    externalExperience: [],
+    auditLog: [...state.auditLog, auditEntry({
+      action: 'DELETE', entity: 'ExternalExperience', entityId: 'all',
+      sourceModule: 'Pricing', previousValue: `${state.externalExperience.length} rows`, newValue: 'cleared'
     })]
   })),
 

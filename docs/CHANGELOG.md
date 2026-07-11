@@ -28,6 +28,20 @@ this phase (that is Stage 6B).
   claims/treaties and Stage 2 helpers (`claimIncurred`, `inflate`).
 - Dashboard nav renamed "AI Pricing" → "Pricing".
 
+### Stage 6A.1 — Historical import, cedant recall, expanded LOBs
+- **Standard LOB catalogue** (Fire, Engineering, Aviation, Liability,
+  Agriculture, Accident & Health, Energy, Bonds & Credit, …) merged with
+  portfolio and imported lines.
+- **CSV experience import** (`pricing/externalData.ts`): tolerant header
+  matching (Year/UW Year, Premium/GWP, Losses/Claims Incurred, …), row
+  validation, downloadable template, persisted in DataStore
+  (`externalExperience`) with audit logging. Imported aggregate losses are
+  exploded into average-severity synthetic losses so per-claim structure
+  mapping (XOL capping) applies; premiums/losses trend like portfolio data.
+- **Cedant recall**: pick a cedant (or type a contract number) and both the
+  live portfolio and imported history filter to that counterparty across all
+  methods, scenarios and the experience table.
+
 ## Stage 5 — Enterprise Retrocession Management Platform
 
 Rebuilt `RetrocessionModule.tsx` as an outward-reinsurance platform with engine

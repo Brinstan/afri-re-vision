@@ -4,8 +4,9 @@
 // current levels with the pricing assumptions, and each loss is mapped into
 // the structure being priced (ceded share, layer tranche, or aggregate).
 
-import type { Claim, Treaty } from '@/components/DataStore';
+import type { Claim, ExternalExperienceRow, Treaty } from '@/components/DataStore';
 import { claimIncurred, inflate } from '@/lib/actuarial';
+import { explodeLosses, scopeExternalRows } from './externalData';
 import { ExperienceYear, MethodResult, PricingAssumptions, PricingStructure } from './types';
 
 /** How much of a single gross loss falls into the priced structure. */
@@ -37,6 +38,8 @@ const yearLossesToStructure = (yearGross: number, yearPremium: number, s: Pricin
 
 const treatyMatches = (t: Treaty, s: PricingStructure): boolean => {
   if (s.linkedTreatyId) return t.id === s.linkedTreatyId;
+  if (s.cedant && t.cedant.toLowerCase() !== s.cedant.toLowerCase()) return false;
+  if (s.contractNumber && !t.contractNumber.toLowerCase().includes(s.contractNumber.toLowerCase())) return false;
   return s.linesOfBusiness.length === 0 ||
     t.lineOfBusiness.some(lob => s.linesOfBusiness.includes(lob));
 };
@@ -49,11 +52,13 @@ export const buildExperience = (
   claims: Claim[],
   treaties: Treaty[],
   structure: PricingStructure,
-  assumptions: PricingAssumptions
+  assumptions: PricingAssumptions,
+  externalRows: ExternalExperienceRow[] = []
 ): ExperienceYear[] => {
   const scopeTreaties = treaties.filter(t => treatyMatches(t, structure));
   const treatyIds = new Set(scopeTreaties.map(t => t.id));
   const scopeClaims = claims.filter(c => treatyIds.has(c.treatyId));
+  const scopedExternal = scopeExternalRows(externalRows, structure);
 
   const years = new Map<number, { premium: number; gross: number; inStructure: number; count: number }>();
   const bucket = (y: number) => {
@@ -74,6 +79,19 @@ export const buildExperience = (
     b.gross += trended;
     b.inStructure += structure.treatyType === 'Stop Loss' ? 0 : lossToStructure(trended, structure);
     b.count += 1;
+  });
+
+  // Imported experience: premium adds to the year; aggregate losses are
+  // exploded into average-severity losses so per-claim structure mapping applies
+  scopedExternal.forEach(row => {
+    const b = bucket(row.year);
+    b.premium += inflate(row.premium, row.year, assumptions.premiumTrendPct);
+    explodeLosses(row).forEach(loss => {
+      const trended = inflate(loss, row.year, assumptions.claimsInflationPct);
+      b.gross += trended;
+      b.inStructure += structure.treatyType === 'Stop Loss' ? 0 : lossToStructure(trended, structure);
+      b.count += 1;
+    });
   });
 
   return Array.from(years.entries())

@@ -24,6 +24,7 @@ import { runScenarios } from '@/pricing/scenario';
 import { validatePricing } from '@/pricing/validation';
 import { rateAdequacyByLob } from '@/pricing/analytics';
 import { exportPricingCsv, exportPricingMemoPdf } from '@/pricing/reporting';
+import { STANDARD_LOBS, parseExperienceCsv, downloadExperienceTemplate, scopeExternalRows } from '@/pricing/externalData';
 
 const fmt = (n: number) => Math.round(n).toLocaleString();
 const fmtM = (n: number) => `${(n / 1_000_000).toFixed(2)}M`;
@@ -38,7 +39,7 @@ const loadHistory = (): PricingRecord[] => {
 };
 
 const PricingSystem = () => {
-  const { treaties, claims } = useDataStore();
+  const { treaties, claims, externalExperience, importExternalExperience, clearExternalExperience } = useDataStore();
 
   const [assumptions, setAssumptions] = useState<PricingAssumptions>(loadPricingAssumptions);
   useEffect(() => { savePricingAssumptions(assumptions); }, [assumptions]);
@@ -59,17 +60,37 @@ const PricingSystem = () => {
   const [lrAttachPct, setLrAttachPct] = useState('');
   const [lrExhaustPct, setLrExhaustPct] = useState('');
   const [subjectPremiumOverride, setSubjectPremiumOverride] = useState('');
+  const [cedantFilter, setCedantFilter] = useState('all');
+  const [contractFilter, setContractFilter] = useState('');
+  const [importErrors, setImportErrors] = useState<string[]>([]);
 
+  // Standard reinsurance lines merged with the live portfolio and imported data
   const portfolioLobs = useMemo(
-    () => Array.from(new Set(treaties.flatMap(t => t.lineOfBusiness))).sort(),
-    [treaties]
+    () => Array.from(new Set([
+      ...STANDARD_LOBS,
+      ...treaties.flatMap(t => t.lineOfBusiness),
+      ...externalExperience.map(r => r.lineOfBusiness)
+    ])).sort(),
+    [treaties, externalExperience]
+  );
+
+  // Known cedants from the portfolio and imported history
+  const knownCedants = useMemo(
+    () => Array.from(new Set([
+      ...treaties.map(t => t.cedant),
+      ...externalExperience.map(r => r.cedant)
+    ].filter(c => c && c !== 'Unknown'))).sort(),
+    [treaties, externalExperience]
   );
 
   const scopeTreaties = useMemo(() => {
+    let scoped = treaties;
     if (treatyType === 'Facultative') return treaties.filter(t => t.id === linkedTreatyId);
+    if (cedantFilter !== 'all') scoped = scoped.filter(t => t.cedant === cedantFilter);
+    if (contractFilter) scoped = scoped.filter(t => t.contractNumber.toLowerCase().includes(contractFilter.toLowerCase()));
     if (selectedLobs.length === 0) return [];
-    return treaties.filter(t => t.lineOfBusiness.some(l => selectedLobs.includes(l)));
-  }, [treaties, treatyType, linkedTreatyId, selectedLobs]);
+    return scoped.filter(t => t.lineOfBusiness.some(l => selectedLobs.includes(l)));
+  }, [treaties, treatyType, linkedTreatyId, selectedLobs, cedantFilter, contractFilter]);
 
   const derivedSubjectPremium = scopeTreaties.reduce((s, t) => s + t.premium, 0);
   const subjectPremium = parseFloat(subjectPremiumOverride) || derivedSubjectPremium;
@@ -86,12 +107,19 @@ const PricingSystem = () => {
     limit: parseFloat(limit) || undefined,
     lrAttachPct: parseFloat(lrAttachPct) || undefined,
     lrExhaustPct: parseFloat(lrExhaustPct) || undefined,
-    linkedTreatyId: treatyType === 'Facultative' ? linkedTreatyId || undefined : undefined
-  }), [treatyType, selectedLobs, subjectPremium, cessionPct, attachment, limit, lrAttachPct, lrExhaustPct, linkedTreatyId, scopeTreaties]);
+    linkedTreatyId: treatyType === 'Facultative' ? linkedTreatyId || undefined : undefined,
+    cedant: cedantFilter !== 'all' ? cedantFilter : undefined,
+    contractNumber: contractFilter || undefined
+  }), [treatyType, selectedLobs, subjectPremium, cessionPct, attachment, limit, lrAttachPct, lrExhaustPct, linkedTreatyId, scopeTreaties, cedantFilter, contractFilter]);
+
+  const scopedExternalCount = useMemo(
+    () => scopeExternalRows(externalExperience, structure).length,
+    [externalExperience, structure]
+  );
 
   // ---- Pricing pipeline (live) -------------------------------------------------
-  const output = useMemo(() => priceStructure(claims, treaties, structure, assumptions), [claims, treaties, structure, assumptions]);
-  const scenarios = useMemo(() => runScenarios(claims, treaties, structure, assumptions), [claims, treaties, structure, assumptions]);
+  const output = useMemo(() => priceStructure(claims, treaties, structure, assumptions, externalExperience), [claims, treaties, structure, assumptions, externalExperience]);
+  const scenarios = useMemo(() => runScenarios(claims, treaties, structure, assumptions, externalExperience), [claims, treaties, structure, assumptions, externalExperience]);
   const issues = useMemo(() => validatePricing(structure, assumptions, output.buildUp, output.experience), [structure, assumptions, output]);
   const adequacy = useMemo(() => rateAdequacyByLob(treaties, claims, assumptions), [treaties, claims, assumptions]);
   const errorCount = issues.filter(i => i.severity === 'error').length;
@@ -119,6 +147,33 @@ const PricingSystem = () => {
     const ok = exportPricingMemoPdf({ structure, assumptions, output, scenarios, issues, adequacy });
     if (ok) toast.success("Pricing memo opened — use the print dialog to save as PDF");
     else toast.error("Pop-up blocked — allow pop-ups to export the memo");
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast.error("Import a .csv file — in Excel use File → Save As → CSV");
+      setImportErrors(['Only .csv files are supported. In Excel: File → Save As → CSV (Comma delimited).']);
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = parseExperienceCsv(String(reader.result ?? ''));
+      setImportErrors(result.errors);
+      if (result.rows.length === 0) {
+        toast.error("No valid rows found — check the column headers against the template");
+      } else {
+        importExternalExperience(
+          result.rows.map((r, i) => ({ ...r, id: `ext-${Date.now()}-${i}`, source: file.name })),
+          file.name
+        );
+        toast.success(`${result.rows.length} experience rows imported from ${file.name}${result.skipped > 0 ? ` (${result.skipped} skipped)` : ''} — pricing recomputed`);
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
   };
 
   const typeHelp: Record<PricingTreatyType, string> = {
@@ -245,10 +300,36 @@ const PricingSystem = () => {
                   </div>
                 )}
 
+                {treatyType !== 'Facultative' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Cedant <span className="text-xs text-muted-foreground font-normal">(recalls their past data)</span></Label>
+                      <Select value={cedantFilter} onValueChange={setCedantFilter}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All cedants</SelectItem>
+                          {knownCedants.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Contract Number <span className="text-xs text-muted-foreground font-normal">(optional match)</span></Label>
+                      <Input value={contractFilter} onChange={(e) => setContractFilter(e.target.value)} placeholder="e.g. 12345" />
+                    </div>
+                  </div>
+                )}
+
                 {(selectedLobs.length > 0 || linkedTreatyId) && (
-                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 text-sm">
+                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 text-sm space-y-1">
                     <p className="font-medium">
                       {scopeTreaties.length} treat{scopeTreaties.length === 1 ? 'y' : 'ies'} in scope · derived subject premium {structure.currency} {fmt(derivedSubjectPremium)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {scopedExternalCount > 0
+                        ? `${scopedExternalCount} imported experience row(s) also feed this pricing${cedantFilter !== 'all' ? ` for ${cedantFilter}` : ''}`
+                        : externalExperience.length > 0
+                          ? 'No imported rows match this scope — check lines/cedant spelling against the imported data'
+                          : 'No imported history — the Historical Experience card below accepts CSV imports'}
                     </p>
                   </div>
                 )}
@@ -353,6 +434,79 @@ const PricingSystem = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Historical experience import */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Historical Experience Import</CardTitle>
+              <CardDescription>
+                Bring past premium and claims data into the pricing evidence — from Excel use File → Save As → CSV.
+                Columns: Year, Cedant, Contract Number, Line of Business, Premium, Losses, Claim Count (Year and Premium required).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Input type="file" accept=".csv" onChange={handleImportFile} className="max-w-xs" />
+                <Button size="sm" variant="outline" onClick={downloadExperienceTemplate}>
+                  <Download className="h-3 w-3 mr-1" />
+                  Download Template
+                </Button>
+                {externalExperience.length > 0 && (
+                  <Button size="sm" variant="outline" onClick={() => {
+                    clearExternalExperience();
+                    setImportErrors([]);
+                    toast.info("Imported experience cleared — pricing recomputed on portfolio data only");
+                  }}>
+                    Clear Imported Data ({externalExperience.length} rows)
+                  </Button>
+                )}
+              </div>
+
+              {importErrors.length > 0 && (
+                <div className="rounded-lg bg-amber-50 dark:bg-amber-950 p-3 space-y-1">
+                  {importErrors.map((err, i) => (
+                    <p key={i} className="text-xs text-amber-800 dark:text-amber-200 flex items-start">
+                      <AlertTriangle className="h-3 w-3 mr-1 mt-0.5 shrink-0" />{err}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {externalExperience.length > 0 && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Year</TableHead>
+                      <TableHead>Cedant</TableHead>
+                      <TableHead>Contract</TableHead>
+                      <TableHead>Line</TableHead>
+                      <TableHead className="text-right">Premium</TableHead>
+                      <TableHead className="text-right">Losses</TableHead>
+                      <TableHead className="text-right">Claims</TableHead>
+                      <TableHead>Source</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {externalExperience.slice(0, 10).map(r => (
+                      <TableRow key={r.id}>
+                        <TableCell>{r.year}</TableCell>
+                        <TableCell>{r.cedant}</TableCell>
+                        <TableCell className="font-mono text-xs">{r.contractNumber || '—'}</TableCell>
+                        <TableCell>{r.lineOfBusiness}</TableCell>
+                        <TableCell className="text-right font-mono">{fmt(r.premium)}</TableCell>
+                        <TableCell className="text-right font-mono">{fmt(r.losses)}</TableCell>
+                        <TableCell className="text-right">{r.claimCount}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{r.source}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+              {externalExperience.length > 10 && (
+                <p className="text-xs text-muted-foreground">Showing first 10 of {externalExperience.length} imported rows.</p>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ------------------------------------------------ Methods */}
