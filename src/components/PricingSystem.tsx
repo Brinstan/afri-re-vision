@@ -25,11 +25,54 @@ import { validatePricing } from '@/pricing/validation';
 import { rateAdequacyByLob } from '@/pricing/analytics';
 import { exportPricingCsv, exportPricingMemoPdf } from '@/pricing/reporting';
 import { STANDARD_LOBS, parseExperienceCsv, downloadExperienceTemplate, scopeExternalRows } from '@/pricing/externalData';
+import { Progress } from "@/components/ui/progress";
+import { Brain } from "lucide-react";
+import { buildFeatures } from '@/pricing/ai/features';
+import { riskScore, portfolioFit, appetiteAssessment, MODEL_REGISTRY } from '@/pricing/ai/models';
+import { buildRecommendations, renewalRecommendations } from '@/pricing/ai/recommendations';
+import { businessMixOptimization } from '@/pricing/ai/optimization';
+import { Explanation } from '@/pricing/ai/types';
 
 const fmt = (n: number) => Math.round(n).toLocaleString();
 const fmtM = (n: number) => `${(n / 1_000_000).toFixed(2)}M`;
 
 const TREATY_TYPES: PricingTreatyType[] = ['Quota Share', 'Surplus', 'XOL', 'Stop Loss', 'Catastrophe', 'Facultative'];
+
+/** Renders an explanation: factor weights, confidence, sensitivity — no black boxes. */
+const ExplanationBlock = ({ explanation }: { explanation: Explanation }) => (
+  <div className="space-y-3 text-sm">
+    <div className="space-y-2">
+      {explanation.factors.map(factor => (
+        <div key={factor.name}>
+          <div className="flex justify-between text-xs mb-1">
+            <span>
+              {factor.name}: <span className="font-medium">{factor.value}</span>
+              <Badge className="ml-2" variant={factor.direction === 'increases' ? 'destructive' : factor.direction === 'decreases' ? 'secondary' : 'outline'}>
+                {factor.direction}
+              </Badge>
+            </span>
+            <span className="text-muted-foreground">{factor.weightPct}% weight</span>
+          </div>
+          <Progress value={factor.weightPct} className="h-1.5" />
+          <p className="text-xs text-muted-foreground mt-0.5">{factor.detail}</p>
+        </div>
+      ))}
+    </div>
+    <div className="flex items-center justify-between rounded bg-muted/50 px-3 py-2">
+      <span className="text-xs">Confidence: <span className="font-bold">{explanation.confidencePct}%</span> — {explanation.confidenceBasis}</span>
+    </div>
+    {explanation.sensitivity.length > 0 && (
+      <div>
+        <p className="text-xs font-medium mb-1">Sensitivity (each variable shifted {explanation.sensitivity[0]?.shift}):</p>
+        {explanation.sensitivity.map(s => (
+          <p key={s.variable} className="text-xs text-muted-foreground">
+            • {s.variable} → result moves {s.resultShiftPct >= 0 ? '+' : ''}{s.resultShiftPct.toFixed(1)}%
+          </p>
+        ))}
+      </div>
+    )}
+  </div>
+);
 
 const loadHistory = (): PricingRecord[] => {
   try {
@@ -124,6 +167,15 @@ const PricingSystem = () => {
   const adequacy = useMemo(() => rateAdequacyByLob(treaties, claims, assumptions), [treaties, claims, assumptions]);
   const errorCount = issues.filter(i => i.severity === 'error').length;
   const b = output.buildUp;
+
+  // ---- Stage 6B: explainable AI layer (augments, never replaces, 6A) --------
+  const features = useMemo(() => buildFeatures(structure, output, treaties, claims, adequacy), [structure, output, treaties, claims, adequacy]);
+  const aiRisk = useMemo(() => riskScore(features), [features]);
+  const aiFit = useMemo(() => portfolioFit(features), [features]);
+  const aiAppetite = useMemo(() => appetiteAssessment(features), [features]);
+  const aiRecs = useMemo(() => buildRecommendations(structure, output, features, assumptions), [structure, output, features, assumptions]);
+  const renewals = useMemo(() => renewalRecommendations(treaties, claims), [treaties, claims]);
+  const mix = useMemo(() => businessMixOptimization(treaties, adequacy), [treaties, adequacy]);
 
   const handleSavePricing = (outcome: PricingRecord['outcome']) => {
     if (errorCount > 0) { toast.error("Resolve validation errors before saving the pricing"); return; }
@@ -238,13 +290,16 @@ const PricingSystem = () => {
       </div>
 
       <Tabs defaultValue="setup" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9">
           <TabsTrigger value="setup">Setup</TabsTrigger>
           <TabsTrigger value="methods">Methods</TabsTrigger>
-          <TabsTrigger value="buildup">Premium Build-Up</TabsTrigger>
+          <TabsTrigger value="buildup">Build-Up</TabsTrigger>
           <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
           <TabsTrigger value="validation">Validation</TabsTrigger>
-          <TabsTrigger value="analytics">Portfolio Analytics</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="ai-advisor">AI Advisor</TabsTrigger>
+          <TabsTrigger value="ai-risk">Risk & Fit</TabsTrigger>
+          <TabsTrigger value="ai-optimize">Optimization</TabsTrigger>
         </TabsList>
 
         {/* ------------------------------------------------ Setup */}
@@ -778,6 +833,237 @@ const PricingSystem = () => {
                   </ResponsiveContainer>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        {/* ------------------------------------------------ AI Advisor */}
+        <TabsContent value="ai-advisor" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Brain className="h-5 w-5 mr-2" />
+                Explainable Recommendations
+              </CardTitle>
+              <CardDescription>
+                Every suggestion is anchored to the deterministic 6A office premium and shows its variables, weights, confidence, and sensitivity — no black boxes.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {aiRecs.map(rec => (
+              <Card key={rec.key}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <span>{rec.label}</span>
+                    <Badge variant="secondary">{rec.explanation.confidencePct}% confidence</Badge>
+                  </CardTitle>
+                  <div className="text-2xl font-bold">{rec.value}</div>
+                  <CardDescription>{rec.rationale}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ExplanationBlock explanation={rec.explanation} />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Model Registry</CardTitle>
+              <CardDescription>Active heuristic models and their backend-ML replacement paths (future integration seam)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Model</TableHead>
+                    <TableHead>Version</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Features</TableHead>
+                    <TableHead>Backend Replacement</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {MODEL_REGISTRY.map(m => (
+                    <TableRow key={m.id}>
+                      <TableCell className="font-medium">{m.name}</TableCell>
+                      <TableCell><Badge variant="outline">v{m.version}</Badge></TableCell>
+                      <TableCell className="text-xs">{m.type}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-56">{m.features.join(', ')}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-56">{m.backendReady}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------ Risk & Fit */}
+        <TabsContent value="ai-risk" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span>Risk Score</span>
+                  <Badge variant={aiRisk.band === 'Low' ? 'secondary' : aiRisk.band === 'Medium' ? 'default' : 'destructive'}>{aiRisk.band}</Badge>
+                </CardTitle>
+                <div className="text-3xl font-bold">{aiRisk.score.toFixed(1)} / 10</div>
+              </CardHeader>
+              <CardContent>
+                <ExplanationBlock explanation={aiRisk.explanation} />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span>Portfolio Fit</span>
+                  <Badge variant={aiFit.score >= 55 ? 'secondary' : 'destructive'}>{aiFit.verdict}</Badge>
+                </CardTitle>
+                <div className="text-3xl font-bold">{aiFit.score.toFixed(0)} / 100</div>
+              </CardHeader>
+              <CardContent>
+                <ExplanationBlock explanation={aiFit.explanation} />
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Risk Appetite Assessment</span>
+                <Badge variant={aiAppetite.withinAppetite ? 'secondary' : 'destructive'}>
+                  {aiAppetite.withinAppetite ? 'Within appetite' : 'Outside appetite'}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Rule</TableHead>
+                    <TableHead>Actual</TableHead>
+                    <TableHead>Limit</TableHead>
+                    <TableHead>Result</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {aiAppetite.checks.map(c => (
+                    <TableRow key={c.rule}>
+                      <TableCell className="font-medium">{c.rule}</TableCell>
+                      <TableCell>{c.actual}</TableCell>
+                      <TableCell>{c.limit}</TableCell>
+                      <TableCell>
+                        <Badge variant={c.pass ? 'secondary' : 'destructive'}>
+                          {c.pass ? <><CheckCircle className="h-3 w-3 mr-1" />Pass</> : <><AlertTriangle className="h-3 w-3 mr-1" />Breach</>}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Renewal Recommendations</CardTitle>
+              <CardDescription>Underwriting decision support across the in-force book</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Treaty</TableHead>
+                    <TableHead className="text-right">Loss Ratio</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead className="text-right">Rate Change</TableHead>
+                    <TableHead>Rationale</TableHead>
+                    <TableHead className="text-right">Confidence</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {renewals.map(r => (
+                    <TableRow key={r.treatyId}>
+                      <TableCell>
+                        <p className="font-medium text-sm">{r.treatyName}</p>
+                        <p className="text-xs text-muted-foreground">{r.cedant}</p>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">{r.lossRatioPct === null ? '—' : `${r.lossRatioPct.toFixed(0)}%`}</TableCell>
+                      <TableCell>
+                        <Badge variant={r.action === 'Renew as-is' ? 'secondary' : r.action === 'Decline' ? 'destructive' : 'default'}>{r.action}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">{r.suggestedRateChangePct > 0 ? `+${r.suggestedRateChangePct}%` : '—'}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-72">{r.rationale}</TableCell>
+                      <TableCell className="text-right">{r.confidencePct}%</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------------------------ Optimization */}
+        <TabsContent value="ai-optimize" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Business Mix Optimization</CardTitle>
+              <CardDescription>
+                Greedy reweighting toward rate-adequate, profitable lines under a 45% single-line concentration cap — fully rule-based and disclosed
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Line of Business</TableHead>
+                    <TableHead className="text-right">Current Share</TableHead>
+                    <TableHead className="text-right">Suggested Share</TableHead>
+                    <TableHead>Direction</TableHead>
+                    <TableHead>Rationale</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {mix.map(m => (
+                    <TableRow key={m.lineOfBusiness}>
+                      <TableCell className="font-medium">{m.lineOfBusiness}</TableCell>
+                      <TableCell className="text-right font-mono">{m.currentSharePct.toFixed(1)}%</TableCell>
+                      <TableCell className="text-right font-mono">{m.suggestedSharePct.toFixed(1)}%</TableCell>
+                      <TableCell>
+                        <Badge variant={m.direction === 'Grow' ? 'secondary' : m.direction === 'Shrink' ? 'destructive' : 'outline'}>{m.direction}</Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-96">{m.rationale}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {mix.length === 0 && <p className="text-center text-muted-foreground py-6">No portfolio data to optimise yet.</p>}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Executive AI Dashboard</CardTitle>
+              <CardDescription>Deal and portfolio intelligence at a glance</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  ['Deal Risk Score', `${aiRisk.score.toFixed(1)}/10`, aiRisk.band],
+                  ['Portfolio Fit', `${aiFit.score.toFixed(0)}/100`, aiFit.verdict],
+                  ['Appetite', aiAppetite.withinAppetite ? 'Within' : 'Breached', `${aiAppetite.checks.filter(c => c.pass).length}/${aiAppetite.checks.length} rules pass`],
+                  ['Renewal Actions', `${renewals.filter(r => r.action !== 'Renew as-is').length} of ${renewals.length}`, 'treaties need attention']
+                ].map(([label, value, sub]) => (
+                  <div key={label as string} className="border rounded-lg p-4">
+                    <p className="text-sm text-muted-foreground">{label}</p>
+                    <p className="text-2xl font-bold">{value}</p>
+                    <p className="text-xs text-muted-foreground">{sub}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-4">
+                All AI outputs are deterministic, explainable heuristics over the Stage 6A actuarial engines — the Model Registry (AI Advisor tab) documents the backend-ML replacement path for each.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

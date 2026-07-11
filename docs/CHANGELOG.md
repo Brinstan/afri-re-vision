@@ -2,6 +2,34 @@
 
 All notable changes, by delivered stage. Commits are on `main`.
 
+## Stage 6B — Explainable AI Pricing & Underwriting Intelligence
+
+Adds an explainable AI layer under `src/pricing/ai/` that AUGMENTS the Stage 6A
+deterministic engines — every output shows its variables, weights, confidence
+and sensitivity; no black boxes.
+
+- **`ai/types.ts`** — Explanation/Recommendation/RiskScore/PortfolioFit types.
+- **`ai/features.ts`** — feature engineering from live experience + 6A output
+  (loss ratio & volatility, frequency, severity, largest loss, credibility Z,
+  rate adequacy, cedant concentration) plus a shared confidence model.
+- **`ai/models.ts`** — risk scoring (0–10, five disclosed weights), portfolio
+  fit (0–100), rule-based risk appetite assessment, generic sensitivity
+  analysis, and a Model Registry documenting the backend-ML replacement path
+  for each heuristic.
+- **`ai/recommendations.ts`** — suggested premium (anchored to the 6A office
+  premium, ±3%/risk point), retention/deductible (severity-anchored), capacity
+  (largest-loss + risk-scaled), layer structure (40/60 split), ceding
+  commission (LR sliding scale 10–32.5%), profit margin (risk & volatility
+  adjusted), treaty structure (frequency/volatility rules), and renewal
+  recommendations across the in-force book (renew / rate increase /
+  restructure / decline with rationale and confidence).
+- **`ai/optimization.ts`** — business-mix optimization (grow/hold/shrink per
+  line under a 45% concentration cap, rate-adequacy driven).
+- **UI:** three new tabs — AI Advisor (recommendation cards with full
+  explanations + Model Registry), Risk & Fit (risk score, portfolio fit,
+  appetite checks, renewal decision support), Optimization (mix suggestions +
+  executive AI dashboard).
+
 ## Stage 6A — Enterprise Traditional Pricing Engine
 
 Replaced the mock "AI-Powered Pricing" screen with a deterministic actuarial

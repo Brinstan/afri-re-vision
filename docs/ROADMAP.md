@@ -15,6 +15,13 @@ Bornhuetter-Ferguson / Cape Cod / Expected Loss Ratio, simplified Mack standard 
 inflation/trend adjustment, diagnostics, XOL analytics, portfolio analytics, charts,
 and exports. Actuary-selectable preferred method.
 
+### Stage 6B — Explainable AI Pricing & Underwriting Intelligence ✅
+Explainable heuristic AI layer over 6A: risk scoring, portfolio fit, appetite
+assessment, seven recommendation types (premium, retention, capacity, layers,
+commission, margin, structure), renewal decision support, business-mix
+optimization, and a Model Registry marking the backend-ML integration seam.
+Every output discloses factors, weights, confidence, and sensitivity.
+
 ### Stage 6A — Enterprise Traditional Pricing Engine ✅
 Deterministic actuarial pricing workstation on `src/pricing/`: burning cost,
 experience/exposure rating, frequency–severity, ELR, credibility blending,

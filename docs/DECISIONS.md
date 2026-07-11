@@ -3,6 +3,15 @@
 A log of consequential decisions and their rationale, so future work doesn't
 re-litigate them. Newest first.
 
+## D-014 · Stage 6B — AI = explainable heuristics anchored to 6A
+The "AI" layer contains no trained models: it is deterministic, weighted
+heuristics over engineered features, always anchored to the 6A office premium
+(suggested premium moves at most ±15% off the actuarial baseline). Every output
+carries factors + weights + confidence + sensitivity, satisfying the
+no-black-box requirement, and the Model Registry names the real ML model each
+heuristic should become once a backend with training data exists. Frontend-only
+by design.
+
 ## D-013 · Stage 6A — Credibility blend is the pricing basis
 The office premium is always driven by a limited-fluctuation credibility blend
 (Z = √(n/N)) of the experience side (experience rating, falling back to burning

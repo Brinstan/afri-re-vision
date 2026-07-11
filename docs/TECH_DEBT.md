@@ -30,6 +30,8 @@ None of these block current functionality; they matter for productionisation.
 | 34 | Surplus pricing relies on a user-estimated ceded share (same per-risk data gap as #29) | `pricing/treatyPricing.ts` |
 | 35 | Experience import accepts CSV only — native .xlsx parsing needs a library (SheetJS); Excel users must Save As CSV | `pricing/externalData.ts` |
 | 36 | Imported aggregate losses are exploded at average severity per year/row — individual large losses in imports are smoothed, understating XOL layer costs for skewed years | `pricing/externalData.ts` |
+| 37 | AI layer is heuristic, not trained — weights are expert-set constants; the Model Registry documents the intended backend ML replacements | `pricing/ai/models.ts` |
+| 38 | Risk appetite limits (LR ≤ 80%, concentration ≤ 60%, etc.) are hardcoded rules, not user-configurable appetite statements | `pricing/ai/models.ts` |
 
 ## Calculation simplifications (intentional, documented)
 

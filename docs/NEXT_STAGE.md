@@ -1,13 +1,11 @@
 # Next Stage — Recommendation
 
-Six phases have taken AfriReVision through the full technical reinsurance lifecycle
-**client-side**: operations (Stage 1), actuarial (2), IFRS 17 (3), accounting (4),
-retrocession (5), and deterministic pricing (6A). The immediate committed next phase is
-**Stage 6B — Explainable AI Pricing & Underwriting Intelligence**, which augments (never
-replaces) the 6A engines with explainable recommendations, risk/portfolio-fit scoring,
-sensitivity analysis, and optimization dashboards — frontend-only, no black boxes.
-After 6B, the biggest limitation remains that everything lives in one browser, so the
-recommended structural stage is **persistence, identity, and period close**.
+All planned functional stages are delivered **client-side**: operations (Stage 1),
+actuarial (2), IFRS 17 (3), accounting (4), retrocession (5), deterministic pricing
+(6A), and explainable AI pricing intelligence (6B). The biggest remaining limitation is
+that everything lives in one browser, so the recommended next stage is **persistence,
+identity, and period close** — a backend that also unlocks real ML training for the
+Stage 6B Model Registry (each heuristic documents its replacement model).
 
 ## Stage 4 (recommended): Backend, Auth & Period Close
 
