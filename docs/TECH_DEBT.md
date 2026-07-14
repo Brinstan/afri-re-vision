@@ -62,7 +62,7 @@ keep that transparency when extending them.
 | # | Item | Impact |
 |---|---|---|
 | 16 | **ESLint config crashes** — `@typescript-eslint/no-unused-expressions` throws (`allowShortCircuit`) under the installed versions | `npm run lint` unusable; `tsc --noEmit` is the working gate |
-| 17 | **Hardcoded palette classes** (`text-gray-900`, `bg-white`, `bg-blue-50`) in older modules don't adapt to dark mode | Cosmetic in dark mode; migrate to semantic tokens |
+| 17 | ~~Hardcoded palette classes don't adapt to dark mode~~ **Resolved** — grays migrated to semantic tokens (`bg-card`, `text-foreground`, `text-muted-foreground`, `border-border`), colored accents given `dark:` variants, recharts tooltip themed in `index.css` | 13 components |
 | 18 | **Bundle > 500 kB** (single chunk, ~640 kB JS) | Build warns; no code-splitting/lazy routes |
 | 19 | **Two toast systems** mounted (shadcn `Toaster` + `sonner`); only sonner is used | Minor; standardise on sonner |
 | 20 | **Unused installed deps** — `react-hook-form`, `zod`, `@tanstack/react-query` present but feature code doesn't use them | Forms are hand-controlled |
@@ -71,9 +71,8 @@ keep that transparency when extending them.
 
 ## Suggested cleanup order
 
-1. Fix ESLint config (17) so linting works again — cheap, unblocks CI.
+1. Fix ESLint config (16) so linting works again — cheap, unblocks CI.
 2. Add unit tests around `lib/actuarial.ts` and `src/ifrs17/*` (21) — highest value,
    these are pure and correctness-critical.
-3. Make Retrocession/Investments store-driven (12, 14) for full data consistency.
-4. Migrate hardcoded colors to tokens (17) for clean dark mode.
-5. Code-split routes/modules (18) to shrink the initial bundle.
+3. Code-split routes/modules (18) to shrink the initial bundle.
+4. ~~Migrate hardcoded colors to tokens (17)~~ done.

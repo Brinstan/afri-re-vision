@@ -2,6 +2,21 @@
 
 All notable changes, by delivered stage. Commits are on `main`.
 
+## Dark-mode overhaul (post-6B polish)
+
+Resolved TECH_DEBT #17 — professional dark mode across the whole app.
+
+- Migrated all hardcoded gray/white palette classes in 13 components to
+  semantic shadcn tokens (`bg-card`, `bg-muted`, `text-foreground`,
+  `text-muted-foreground`, `border-border`), so structure inherits the theme.
+- Added `dark:` variants to every colored accent (status badges, alert tints,
+  KPI deltas, gradient banners) — e.g. `bg-green-100 text-green-800` now pairs
+  with `dark:bg-green-950/50 dark:text-green-300`.
+- Themed the recharts default tooltip via `index.css` (was hardcoded white,
+  unreadable in dark mode).
+- Verified with a computed-style audit across all 9 modules in both themes:
+  no light backgrounds or near-black text remain in dark mode.
+
 ## Stage 6B — Explainable AI Pricing & Underwriting Intelligence
 
 Adds an explainable AI layer under `src/pricing/ai/` that AUGMENTS the Stage 6A

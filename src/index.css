@@ -101,3 +101,14 @@
     @apply bg-background text-foreground;
   }
 }
+/* Recharts renders its default tooltip with a hardcoded white background;
+   force it onto theme tokens so chart tooltips are readable in dark mode. */
+.recharts-default-tooltip {
+  background-color: hsl(var(--card)) !important;
+  border-color: hsl(var(--border)) !important;
+  color: hsl(var(--card-foreground)) !important;
+}
+.recharts-tooltip-label,
+.recharts-tooltip-item-list .recharts-tooltip-item {
+  color: hsl(var(--card-foreground)) !important;
+}

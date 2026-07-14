@@ -319,7 +319,7 @@ const UnderwritingModuleIntegrated = () => {
           placeholder="100.00"
           className={`pr-8 ${error ? 'border-red-500' : ''}`}
         />
-        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
+        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">%</span>
       </div>
       {error && (
         <div className="flex items-center text-red-500 text-sm">
@@ -334,8 +334,8 @@ const UnderwritingModuleIntegrated = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Integrated Underwriting Module</h2>
-          <p className="text-gray-600">Comprehensive treaty and policy underwriting with automatic treaty conversion</p>
+          <h2 className="text-2xl font-bold text-foreground">Integrated Underwriting Module</h2>
+          <p className="text-muted-foreground">Comprehensive treaty and policy underwriting with automatic treaty conversion</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={handleResetForm}>
@@ -541,8 +541,8 @@ const UnderwritingModuleIntegrated = () => {
                 ))}
               </div>
               {selectedLines.length > 0 && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm font-medium text-blue-900">Selected Lines:</p>
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-200">Selected Lines:</p>
                   <div className="flex flex-wrap gap-2 mt-2">
                     {selectedLines.map(lineId => {
                       const line = linesOfBusiness.find(l => l.id === lineId);
@@ -783,7 +783,7 @@ const UnderwritingModuleIntegrated = () => {
                               placeholder="100.00"
                               className="pr-8"
                             />
-                            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
+                            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">%</span>
                           </div>
                         </div>
                       </div>
@@ -791,15 +791,15 @@ const UnderwritingModuleIntegrated = () => {
                   ))}
                 </div>
 
-                <div className={`p-4 rounded-lg ${isParticipationValid() ? 'bg-green-50' : 'bg-red-50'}`}>
+                <div className={`p-4 rounded-lg ${isParticipationValid() ? 'bg-green-50 dark:bg-green-950/40' : 'bg-red-50 dark:bg-red-950/40'}`}>
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Total Participation:</span>
-                    <span className={`text-lg font-bold ${isParticipationValid() ? 'text-green-700' : 'text-red-700'}`}>
+                    <span className={`text-lg font-bold ${isParticipationValid() ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
                       {getTotalParticipation().toFixed(2)}%
                     </span>
                   </div>
                   {!isParticipationValid() && (
-                    <div className="flex items-center mt-2 text-red-600 text-sm">
+                    <div className="flex items-center mt-2 text-red-600 dark:text-red-400 text-sm">
                       <AlertTriangle className="h-3 w-3 mr-1" />
                       Total participation cannot exceed 100%
                     </div>
@@ -1262,7 +1262,7 @@ const UnderwritingModuleIntegrated = () => {
                             {contract.status}
                           </Badge>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
                           <div>
                             <p><strong>Contract Number:</strong> {contract.contractNumber}</p>
                             <p><strong>Type:</strong> {contract.contractType}</p>
@@ -1295,7 +1295,7 @@ const UnderwritingModuleIntegrated = () => {
                           </Button>
                         )}
                         {contract.status === 'Active' && (
-                          <Badge className="bg-green-100 text-green-800">
+                          <Badge className="bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300">
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Converted to Treaty
                           </Badge>
@@ -1310,7 +1310,7 @@ const UnderwritingModuleIntegrated = () => {
                 ))}
                 
                 {underwritingContracts.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-muted-foreground">
                     <p>No underwriting contracts saved yet.</p>
                     <p className="text-sm">Create a new contract using the form above.</p>
                   </div>

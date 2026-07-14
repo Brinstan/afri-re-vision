@@ -300,8 +300,8 @@ This analysis is based on current portfolio data and market conditions.
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Portfolio Analysis</h2>
-          <p className="text-gray-600">Comprehensive portfolio performance and risk analysis</p>
+          <h2 className="text-2xl font-bold text-foreground">Portfolio Analysis</h2>
+          <p className="text-muted-foreground">Comprehensive portfolio performance and risk analysis</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={() => exportAnalysis('txt')}>
@@ -404,7 +404,7 @@ This analysis is based on current portfolio data and market conditions.
               <CardContent>
                 <div className="text-2xl font-bold">USD {(metrics.totalPremium / 1000000).toFixed(1)}M</div>
                 <p className="text-xs text-muted-foreground">
-                  <span className="text-green-600">+12.5%</span> from last period
+                  <span className="text-green-600 dark:text-green-400">+12.5%</span> from last period
                 </p>
               </CardContent>
             </Card>
@@ -417,7 +417,7 @@ This analysis is based on current portfolio data and market conditions.
               <CardContent>
                 <div className="text-2xl font-bold">{metrics.lossRatio.toFixed(1)}%</div>
                 <p className="text-xs text-muted-foreground">
-                  <span className="text-green-600">-3.2%</span> improvement
+                  <span className="text-green-600 dark:text-green-400">-3.2%</span> improvement
                 </p>
               </CardContent>
             </Card>
@@ -480,7 +480,7 @@ This analysis is based on current portfolio data and market conditions.
                     <div key={country} className="flex justify-between items-center">
                       <div>
                         <p className="font-medium">{country}</p>
-                        <p className="text-sm text-gray-600">{data.treatyCount} treaties</p>
+                        <p className="text-sm text-muted-foreground">{data.treatyCount} treaties</p>
                       </div>
                       <div className="text-right">
                         <p className="font-medium">{data.marketShare.toFixed(1)}%</p>
@@ -507,19 +507,19 @@ This analysis is based on current portfolio data and market conditions.
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Premium Growth</p>
-                      <p className="text-2xl font-bold text-green-600">+{trends.premiumGrowth}%</p>
+                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">+{trends.premiumGrowth}%</p>
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Claims Growth</p>
-                      <p className="text-2xl font-bold text-orange-600">+{trends.claimsGrowth}%</p>
+                      <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">+{trends.claimsGrowth}%</p>
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Efficiency Ratio</p>
-                      <p className="text-2xl font-bold text-blue-600">{trends.efficiency}%</p>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{trends.efficiency}%</p>
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Market Position</p>
-                      <p className="text-2xl font-bold text-purple-600">{trends.marketPosition}</p>
+                      <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{trends.marketPosition}</p>
                     </div>
                   </div>
                 </div>
@@ -546,15 +546,15 @@ This analysis is based on current portfolio data and market conditions.
                       </div>
                       <div className="grid grid-cols-3 gap-2 text-sm">
                         <div>
-                          <p className="text-gray-600">Premium</p>
+                          <p className="text-muted-foreground">Premium</p>
                           <p className="font-medium">USD {(data.premium / 1000000).toFixed(1)}M</p>
                         </div>
                         <div>
-                          <p className="text-gray-600">Loss Ratio</p>
+                          <p className="text-muted-foreground">Loss Ratio</p>
                           <p className="font-medium">{data.lossRatio.toFixed(1)}%</p>
                         </div>
                         <div>
-                          <p className="text-gray-600">Treaties</p>
+                          <p className="text-muted-foreground">Treaties</p>
                           <p className="font-medium">{data.treatyCount}</p>
                         </div>
                       </div>
@@ -575,7 +575,7 @@ This analysis is based on current portfolio data and market conditions.
               <CardContent>
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 gap-4">
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
                       <span className="font-medium">Overall Risk Level</span>
                       <Badge variant={
                         riskAssessment.overallRisk === 'Low' ? 'secondary' :
@@ -618,21 +618,21 @@ This analysis is based on current portfolio data and market conditions.
                 <div className="space-y-3">
                   {riskAssessment.recommendations.length > 0 ? (
                     riskAssessment.recommendations.map((rec, index) => (
-                      <div key={index} className="flex items-start space-x-2 p-3 bg-yellow-50 rounded-lg">
-                        <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
+                      <div key={index} className="flex items-start space-x-2 p-3 bg-yellow-50 dark:bg-yellow-950/40 rounded-lg">
+                        <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
                         <p className="text-sm">{rec}</p>
                       </div>
                     ))
                   ) : (
-                    <div className="flex items-center space-x-2 p-3 bg-green-50 rounded-lg">
-                      <Shield className="h-4 w-4 text-green-600" />
+                    <div className="flex items-center space-x-2 p-3 bg-green-50 dark:bg-green-950/40 rounded-lg">
+                      <Shield className="h-4 w-4 text-green-600 dark:text-green-400" />
                       <p className="text-sm">Portfolio risk profile is well-balanced. No immediate action required.</p>
                     </div>
                   )}
                   
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                    <h4 className="font-medium text-blue-900 mb-2">Risk Management Best Practices</h4>
-                    <ul className="text-sm text-blue-800 space-y-1">
+                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg">
+                    <h4 className="font-medium text-blue-900 dark:text-blue-200 mb-2">Risk Management Best Practices</h4>
+                    <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
                       <li>• Maintain geographic diversification across multiple markets</li>
                       <li>• Monitor concentration limits for individual treaties</li>
                       <li>• Regular review of line of business performance</li>
@@ -673,8 +673,8 @@ This analysis is based on current portfolio data and market conditions.
                       <TableCell>USD {(data.claims / 1000000).toFixed(1)}M</TableCell>
                       <TableCell>
                         <span className={`font-medium ${
-                          data.lossRatio < 60 ? 'text-green-600' :
-                          data.lossRatio < 80 ? 'text-yellow-600' : 'text-red-600'
+                          data.lossRatio < 60 ? 'text-green-600 dark:text-green-400' :
+                          data.lossRatio < 80 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
                         }`}>
                           {data.lossRatio.toFixed(1)}%
                         </span>
@@ -781,21 +781,21 @@ This analysis is based on current portfolio data and market conditions.
               <CardContent>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 bg-green-50 rounded-lg">
-                      <TrendingUp className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                    <div className="text-center p-4 bg-green-50 dark:bg-green-950/40 rounded-lg">
+                      <TrendingUp className="h-8 w-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
                       <p className="text-sm font-medium">Premium Growth</p>
-                      <p className="text-2xl font-bold text-green-600">+{trends.premiumGrowth}%</p>
-                      <p className="text-xs text-gray-600">Year over year</p>
+                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">+{trends.premiumGrowth}%</p>
+                      <p className="text-xs text-muted-foreground">Year over year</p>
                     </div>
-                    <div className="text-center p-4 bg-blue-50 rounded-lg">
-                      <Activity className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                    <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/40 rounded-lg">
+                      <Activity className="h-8 w-8 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
                       <p className="text-sm font-medium">Efficiency</p>
-                      <p className="text-2xl font-bold text-blue-600">{trends.efficiency}%</p>
-                      <p className="text-xs text-gray-600">Operational efficiency</p>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{trends.efficiency}%</p>
+                      <p className="text-xs text-muted-foreground">Operational efficiency</p>
                     </div>
                   </div>
                   
-                  <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="p-4 bg-muted/50 rounded-lg">
                     <h4 className="font-medium mb-2">Trend Analysis</h4>
                     <ul className="text-sm space-y-1">
                       <li>• Premium volume showing consistent growth</li>
@@ -814,25 +814,25 @@ This analysis is based on current portfolio data and market conditions.
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="text-center p-4 bg-purple-50 rounded-lg">
-                    <Target className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                  <div className="text-center p-4 bg-purple-50 dark:bg-purple-950/40 rounded-lg">
+                    <Target className="h-8 w-8 text-purple-600 dark:text-purple-400 mx-auto mb-2" />
                     <p className="text-sm font-medium">Market Position</p>
-                    <p className="text-2xl font-bold text-purple-600">{trends.marketPosition}</p>
-                    <p className="text-xs text-gray-600">Competitive standing</p>
+                    <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{trends.marketPosition}</p>
+                    <p className="text-xs text-muted-foreground">Competitive standing</p>
                   </div>
                   
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm">Market Share Growth</span>
-                      <span className="font-medium text-green-600">+2.3%</span>
+                      <span className="font-medium text-green-600 dark:text-green-400">+2.3%</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm">Customer Retention</span>
-                      <span className="font-medium text-blue-600">94.2%</span>
+                      <span className="font-medium text-blue-600 dark:text-blue-400">94.2%</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm">New Business Growth</span>
-                      <span className="font-medium text-purple-600">+18.5%</span>
+                      <span className="font-medium text-purple-600 dark:text-purple-400">+18.5%</span>
                     </div>
                   </div>
                 </div>

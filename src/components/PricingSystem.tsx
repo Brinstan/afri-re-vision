@@ -241,8 +241,8 @@ const PricingSystem = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Pricing System</h2>
-          <p className="text-gray-600">
+          <h2 className="text-2xl font-bold text-foreground">Pricing System</h2>
+          <p className="text-muted-foreground">
             Deterministic actuarial pricing from live portfolio data · {claims.length} claims, {treaties.length} treaties in evidence
           </p>
         </div>
@@ -375,7 +375,7 @@ const PricingSystem = () => {
                 )}
 
                 {(selectedLobs.length > 0 || linkedTreatyId) && (
-                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 text-sm space-y-1">
+                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950/40 dark:bg-blue-950 p-3 text-sm space-y-1">
                     <p className="font-medium">
                       {scopeTreaties.length} treat{scopeTreaties.length === 1 ? 'y' : 'ies'} in scope · derived subject premium {structure.currency} {fmt(derivedSubjectPremium)}
                     </p>
@@ -518,9 +518,9 @@ const PricingSystem = () => {
               </div>
 
               {importErrors.length > 0 && (
-                <div className="rounded-lg bg-amber-50 dark:bg-amber-950 p-3 space-y-1">
+                <div className="rounded-lg bg-amber-50 dark:bg-amber-950/40 dark:bg-amber-950 p-3 space-y-1">
                   {importErrors.map((err, i) => (
-                    <p key={i} className="text-xs text-amber-800 dark:text-amber-200 flex items-start">
+                    <p key={i} className="text-xs text-amber-800 dark:text-amber-300 dark:text-amber-200 flex items-start">
                       <AlertTriangle className="h-3 w-3 mr-1 mt-0.5 shrink-0" />{err}
                     </p>
                   ))}
@@ -599,7 +599,7 @@ const PricingSystem = () => {
                 </TableBody>
               </Table>
 
-              <div className="mt-4 rounded-lg bg-blue-50 dark:bg-blue-950 p-4 space-y-1">
+              <div className="mt-4 rounded-lg bg-blue-50 dark:bg-blue-950/40 dark:bg-blue-950 p-4 space-y-1">
                 <p className="font-medium text-sm">Credibility Blend — {fmt(output.blend.blendedLossCost)}</p>
                 <p className="text-xs text-muted-foreground">{output.blend.note}</p>
                 <p className="text-xs text-muted-foreground">
@@ -729,7 +729,7 @@ const PricingSystem = () => {
                       <TableCell className="text-right">{s.inflationShiftPct ? `+${s.inflationShiftPct}%` : '—'}</TableCell>
                       <TableCell className="text-right">{s.structureShiftPct ? `+${s.structureShiftPct}%` : '—'}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(s.officePremium)}</TableCell>
-                      <TableCell className={`text-right font-mono ${(s.deltaVsBasePct ?? 0) > 0 ? 'text-red-600' : (s.deltaVsBasePct ?? 0) < 0 ? 'text-green-600' : ''}`}>
+                      <TableCell className={`text-right font-mono ${(s.deltaVsBasePct ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : (s.deltaVsBasePct ?? 0) < 0 ? 'text-green-600 dark:text-green-400' : ''}`}>
                         {s.deltaVsBasePct === null || s.name === 'Base' ? '—' : `${s.deltaVsBasePct >= 0 ? '+' : ''}${s.deltaVsBasePct.toFixed(1)}%`}
                       </TableCell>
                     </TableRow>
@@ -759,13 +759,13 @@ const PricingSystem = () => {
             </CardHeader>
             <CardContent className="space-y-2">
               {issues.length === 0 ? (
-                <div className="flex items-start space-x-2 p-3 rounded-lg bg-green-50 dark:bg-green-950">
-                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                <div className="flex items-start space-x-2 p-3 rounded-lg bg-green-50 dark:bg-green-950/40 dark:bg-green-950">
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
                   <p className="text-sm">All pricing validations pass.</p>
                 </div>
               ) : issues.map((issue, i) => (
-                <div key={i} className={`flex items-start space-x-2 p-3 rounded-lg ${issue.severity === 'error' ? 'bg-red-50 dark:bg-red-950' : 'bg-amber-50 dark:bg-amber-950'}`}>
-                  <AlertTriangle className={`h-4 w-4 mt-0.5 shrink-0 ${issue.severity === 'error' ? 'text-red-600' : 'text-amber-600'}`} />
+                <div key={i} className={`flex items-start space-x-2 p-3 rounded-lg ${issue.severity === 'error' ? 'bg-red-50 dark:bg-red-950/40 dark:bg-red-950' : 'bg-amber-50 dark:bg-amber-950/40 dark:bg-amber-950'}`}>
+                  <AlertTriangle className={`h-4 w-4 mt-0.5 shrink-0 ${issue.severity === 'error' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`} />
                   <div>
                     <p className="text-sm">{issue.message}</p>
                     <p className="text-xs text-muted-foreground">{issue.severity}</p>

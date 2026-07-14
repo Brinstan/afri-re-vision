@@ -149,8 +149,8 @@ const IfrsReporting = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">IFRS 17 Reporting Workstation</h2>
-          <p className="text-gray-600">
+          <h2 className="text-2xl font-bold text-foreground">IFRS 17 Reporting Workstation</h2>
+          <p className="text-muted-foreground">
             Live measurement from {filteredTreaties.length} treaties and {filteredClaims.length} claims · IBNR from {actuarialMethodLabel}
           </p>
         </div>
@@ -247,7 +247,7 @@ const IfrsReporting = () => {
               {kpi.icon}
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${kpi.label === 'Technical Result' && kpi.value < 0 ? 'text-red-600' : ''}`}>
+              <div className={`text-2xl font-bold ${kpi.label === 'Technical Result' && kpi.value < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
                 {assumptions.reportingCurrency} {fmtM(kpi.value)}
               </div>
               <p className="text-xs text-muted-foreground">{kpi.sub}</p>
@@ -287,7 +287,7 @@ const IfrsReporting = () => {
                     ] as Array<[string, number, boolean]>).map(([label, value, emphasis]) => (
                       <TableRow key={label} className={emphasis ? 'font-bold border-t-2' : ''}>
                         <TableCell>{label}</TableCell>
-                        <TableCell className={`text-right font-mono ${value < 0 ? 'text-red-600' : ''}`}>
+                        <TableCell className={`text-right font-mono ${value < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
                           {value < 0 ? `(${fmt(Math.abs(value))})` : fmt(value)}
                         </TableCell>
                       </TableRow>
@@ -359,7 +359,7 @@ const IfrsReporting = () => {
                       <TableCell className="text-right font-mono">{fmt(p.revenue)}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(p.claimsIncurred)}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(p.expenses)}</TableCell>
-                      <TableCell className={`text-right font-mono ${p.result < 0 ? 'text-red-600' : 'text-green-600'}`}>{fmt(p.result)}</TableCell>
+                      <TableCell className={`text-right font-mono ${p.result < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{fmt(p.result)}</TableCell>
                       <TableCell className="text-right font-mono">{p.lossRatio === null ? '—' : `${p.lossRatio.toFixed(1)}%`}</TableCell>
                     </TableRow>
                   ))}
@@ -408,7 +408,7 @@ const IfrsReporting = () => {
                       <TableCell className="text-right font-mono">{fmt(r.revenueRecognized)}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(r.acquisitionCashFlows)}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(r.csm)}</TableCell>
-                      <TableCell className={`text-right font-mono ${r.lossComponent > 0 ? 'text-red-600' : ''}`}>{fmt(r.lossComponent)}</TableCell>
+                      <TableCell className={`text-right font-mono ${r.lossComponent > 0 ? 'text-red-600 dark:text-red-400' : ''}`}>{fmt(r.lossComponent)}</TableCell>
                       <TableCell className="text-right font-mono font-medium">{fmt(r.closingBalance)}</TableCell>
                       <TableCell className="text-right">{(r.earnedFraction * 100).toFixed(0)}%</TableCell>
                     </TableRow>
@@ -501,7 +501,7 @@ const IfrsReporting = () => {
                     ] as Array<[string, number]>).map(([label, value]) => (
                       <TableRow key={label}>
                         <TableCell>{label}</TableCell>
-                        <TableCell className={`text-right font-mono ${value < 0 ? 'text-green-600' : ''}`}>
+                        <TableCell className={`text-right font-mono ${value < 0 ? 'text-green-600 dark:text-green-400' : ''}`}>
                           {value < 0 ? `(${fmt(Math.abs(value))})` : fmt(value)}
                         </TableCell>
                       </TableRow>
@@ -536,7 +536,7 @@ const IfrsReporting = () => {
                         <TableCell className="font-medium">{r.treatyName}</TableCell>
                         <TableCell className="text-right font-mono">{fmt(r.booked)}</TableCell>
                         <TableCell className="text-right font-mono">{fmt(r.paid)}</TableCell>
-                        <TableCell className={`text-right font-mono ${r.outstanding > 0 ? 'text-red-600' : ''}`}>{fmt(r.outstanding)}</TableCell>
+                        <TableCell className={`text-right font-mono ${r.outstanding > 0 ? 'text-red-600 dark:text-red-400' : ''}`}>{fmt(r.outstanding)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -568,7 +568,7 @@ const IfrsReporting = () => {
                     ] as Array<[string, number]>).map(([label, value], i, arr) => (
                       <TableRow key={label} className={i === arr.length - 1 ? 'font-bold border-t-2' : ''}>
                         <TableCell>{label}</TableCell>
-                        <TableCell className={`text-right font-mono ${value < 0 ? 'text-red-600' : ''}`}>{fmt(value)}</TableCell>
+                        <TableCell className={`text-right font-mono ${value < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>{fmt(value)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -692,7 +692,7 @@ const IfrsReporting = () => {
                       <TableCell className="text-right font-mono">{fmt(p.premium)}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(p.revenue)}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(p.claimsIncurred)}</TableCell>
-                      <TableCell className={`text-right font-mono ${p.result < 0 ? 'text-red-600' : 'text-green-600'}`}>{fmt(p.result)}</TableCell>
+                      <TableCell className={`text-right font-mono ${p.result < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{fmt(p.result)}</TableCell>
                       <TableCell className="text-right font-mono">{p.lossRatio === null ? '—' : `${p.lossRatio.toFixed(1)}%`}</TableCell>
                     </TableRow>
                   ))}

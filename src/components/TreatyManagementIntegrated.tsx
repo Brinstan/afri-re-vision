@@ -241,8 +241,8 @@ const TreatyManagementIntegrated = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Integrated Treaty Management</h2>
-          <p className="text-gray-600">Premium booking, monthly returns, and comprehensive inward treaty management</p>
+          <h2 className="text-2xl font-bold text-foreground">Integrated Treaty Management</h2>
+          <p className="text-muted-foreground">Premium booking, monthly returns, and comprehensive inward treaty management</p>
         </div>
       </div>
 
@@ -353,8 +353,8 @@ const TreatyManagementIntegrated = () => {
                   </div>
 
                   {(premiumType === "MDP" || premiumType === "Adjustment") && (
-                    <div className="bg-blue-50 p-4 rounded-lg space-y-3">
-                      <h4 className="font-medium text-blue-900">Brokerage Calculation</h4>
+                    <div className="bg-blue-50 dark:bg-blue-950/40 p-4 rounded-lg space-y-3">
+                      <h4 className="font-medium text-blue-900 dark:text-blue-200">Brokerage Calculation</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="brokeragePercentage">Brokerage Percentage (%)</Label>
@@ -368,7 +368,7 @@ const TreatyManagementIntegrated = () => {
                         </div>
                         <div className="space-y-2">
                           <Label>Brokerage Amount</Label>
-                          <div className="p-2 bg-white rounded border">
+                          <div className="p-2 bg-card rounded border">
                             {currency} {amounts.brokerageAmount}
                           </div>
                         </div>
@@ -376,12 +376,12 @@ const TreatyManagementIntegrated = () => {
                     </div>
                   )}
 
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                    <h4 className="font-medium text-gray-900">Tax Calculations</h4>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                    <h4 className="font-medium text-foreground">Tax Calculations</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>VAT on Premium (18%)</Label>
-                        <div className="p-2 bg-white rounded border">
+                        <div className="p-2 bg-card rounded border">
                           {currency} {amounts.vatAmount}
                         </div>
                       </div>
@@ -397,17 +397,17 @@ const TreatyManagementIntegrated = () => {
                       </div>
                       <div className="space-y-2">
                         <Label>Tax Amount</Label>
-                        <div className="p-2 bg-white rounded border">
+                        <div className="p-2 bg-card rounded border">
                           {currency} {amounts.taxAmount}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-green-50 p-4 rounded-lg">
+                  <div className="bg-green-50 dark:bg-green-950/40 p-4 rounded-lg">
                     <div className="space-y-2">
                       <Label>Total Amount (Premium + VAT + Tax)</Label>
-                      <div className="p-2 bg-white rounded border font-bold text-lg">
+                      <div className="p-2 bg-card rounded border font-bold text-lg">
                         {currency} {parseFloat(amounts.totalAmount).toLocaleString()}
                       </div>
                     </div>
@@ -548,8 +548,8 @@ const TreatyManagementIntegrated = () => {
                 />
               </div>
 
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="font-medium text-blue-900 mb-2">Calculated Results</h4>
+              <div className="bg-blue-50 dark:bg-blue-950/40 p-4 rounded-lg">
+                <h4 className="font-medium text-blue-900 dark:text-blue-200 mb-2">Calculated Results</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
                     <p>Loss Ratio: <span className="font-bold">{returnCalcs.lossRatio.toFixed(1)}%</span></p>
@@ -557,7 +557,7 @@ const TreatyManagementIntegrated = () => {
                   </div>
                   <div>
                     <p>Combined Ratio: <span className="font-bold">{returnCalcs.combinedRatio.toFixed(1)}%</span></p>
-                    <p>Profit/Loss: <span className={`font-bold ${returnCalcs.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p>Profit/Loss: <span className={`font-bold ${returnCalcs.profitLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {returnCalcs.profitLoss >= 0 ? '+' : '-'}USD {Math.abs(returnCalcs.profitLoss).toLocaleString()}
                     </span></p>
                   </div>
@@ -650,7 +650,7 @@ const TreatyManagementIntegrated = () => {
                           <TableCell>
                             <div>
                               <p className="font-medium">{claimsInfo.totalClaims} claims</p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-muted-foreground">
                                 USD {claimsInfo.totalClaimsPaid.toLocaleString()} paid
                               </p>
                             </div>
@@ -837,9 +837,9 @@ const TreatyManagementIntegrated = () => {
                             <div className="flex justify-between items-start">
                               <div>
                                 <p className="font-medium">{claim.claimNumber}</p>
-                                <p className="text-sm text-gray-600">Date of Loss: {claim.dateOfLoss}</p>
-                                <p className="text-sm text-gray-600">Insured: {claim.insuredName}</p>
-                                <p className="text-sm text-gray-600">{claim.claimDescription}</p>
+                                <p className="text-sm text-muted-foreground">Date of Loss: {claim.dateOfLoss}</p>
+                                <p className="text-sm text-muted-foreground">Insured: {claim.insuredName}</p>
+                                <p className="text-sm text-muted-foreground">{claim.claimDescription}</p>
                               </div>
                               <div className="text-right">
                                 <p className="font-medium">{claim.currency} {claim.claimAmount.toLocaleString()}</p>
@@ -847,7 +847,7 @@ const TreatyManagementIntegrated = () => {
                                   {claim.status}
                                 </Badge>
                                 {claim.retroRecovery && (
-                                  <p className="text-xs text-green-600 mt-1">
+                                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                                     Retro Recovery: USD {claim.retroRecovery.toLocaleString()}
                                   </p>
                                 )}
@@ -857,7 +857,7 @@ const TreatyManagementIntegrated = () => {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-gray-500 text-center py-4">No claims recorded for this treaty</p>
+                      <p className="text-muted-foreground text-center py-4">No claims recorded for this treaty</p>
                     );
                   })()}
                 </CardContent>
@@ -881,19 +881,19 @@ const TreatyManagementIntegrated = () => {
                           </div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-sm">
                             <div>
-                              <p className="text-gray-600">Limit</p>
+                              <p className="text-muted-foreground">Limit</p>
                               <p className="font-medium">USD {layer.limit.toLocaleString()}</p>
                             </div>
                             <div>
-                              <p className="text-gray-600">Retention</p>
+                              <p className="text-muted-foreground">Retention</p>
                               <p className="font-medium">USD {layer.retention.toLocaleString()}</p>
                             </div>
                             <div>
-                              <p className="text-gray-600">Remaining</p>
+                              <p className="text-muted-foreground">Remaining</p>
                               <p className="font-medium">USD {layer.remainingCapacity.toLocaleString()}</p>
                             </div>
                             <div>
-                              <p className="text-gray-600">Reinstatement</p>
+                              <p className="text-muted-foreground">Reinstatement</p>
                               <p className="font-medium">{layer.reinstatementRate}%</p>
                             </div>
                           </div>

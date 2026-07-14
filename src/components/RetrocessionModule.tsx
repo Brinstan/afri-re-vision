@@ -410,8 +410,8 @@ const RetrocessionModule = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Retrocession Management Platform</h2>
-          <p className="text-gray-600">
+          <h2 className="text-2xl font-bold text-foreground">Retrocession Management Platform</h2>
+          <p className="text-muted-foreground">
             {retroProgrammes.length} programmes · {retrocessionaires.length} markets · recoveries recompute live from claims
           </p>
         </div>
@@ -571,8 +571,8 @@ const RetrocessionModule = () => {
                     <div><p className="text-muted-foreground">Retention</p><p className="font-bold">{fmt(p.retention)}</p></div>
                     <div><p className="text-muted-foreground">Capacity</p><p className="font-bold">{fmt(prof?.capacity ?? 0)}</p></div>
                     <div><p className="text-muted-foreground">Retro Premium</p><p className="font-bold">{fmt(prof?.retroPremium ?? 0)}</p></div>
-                    <div><p className="text-muted-foreground">Expected Recoveries</p><p className="font-bold text-green-600">{fmt(prof?.expectedRecoveries ?? 0)}</p></div>
-                    <div><p className="text-muted-foreground">Net Cost</p><p className={`font-bold ${(prof?.netCost ?? 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>{fmt(prof?.netCost ?? 0)}</p></div>
+                    <div><p className="text-muted-foreground">Expected Recoveries</p><p className="font-bold text-green-600 dark:text-green-400">{fmt(prof?.expectedRecoveries ?? 0)}</p></div>
+                    <div><p className="text-muted-foreground">Net Cost</p><p className={`font-bold ${(prof?.netCost ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{fmt(prof?.netCost ?? 0)}</p></div>
                   </div>
                   {/* Layer structure visual */}
                   <div className="space-y-2">
@@ -592,7 +592,7 @@ const RetrocessionModule = () => {
                     {p.maxLinePerRisk ? ` · Max line ${fmt(p.maxLinePerRisk)} × ${p.numberOfLines} lines` : ''}
                     {p.reinstatementsCount ? ` · ${p.reinstatementsCount} reinst @ ${p.reinstatementRatePct ?? 100}%` : ''}
                   </p>
-                  <p className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                  <p className="text-xs font-medium text-blue-700 dark:text-blue-300 dark:text-blue-400">
                     Covers {p.linkedTreatyId
                       ? `1 linked treaty (${treaties.find(t => t.id === p.linkedTreatyId)?.treatyName ?? '—'})`
                       : `${treaties.filter(t =>
@@ -724,9 +724,9 @@ const RetrocessionModule = () => {
                           <TableCell className="text-xs">{r.programmeCode}<br />{r.layerName}</TableCell>
                           <TableCell className="text-right font-mono">{fmt(r.grossLoss)}</TableCell>
                           <TableCell className="text-right font-mono">{fmt(r.retention)}</TableCell>
-                          <TableCell className="text-right font-mono text-blue-600">{fmt(r.recoverableAmount)}</TableCell>
-                          <TableCell className="text-right font-mono text-green-600">{fmt(r.paidRecovery)}</TableCell>
-                          <TableCell className="text-right font-mono text-red-600">{fmt(r.outstandingRecovery)}</TableCell>
+                          <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">{fmt(r.recoverableAmount)}</TableCell>
+                          <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{fmt(r.paidRecovery)}</TableCell>
+                          <TableCell className="text-right font-mono text-red-600 dark:text-red-400">{fmt(r.outstandingRecovery)}</TableCell>
                           <TableCell className="text-right font-mono">{fmt(r.recoveryReserve)}</TableCell>
                           <TableCell className="text-right font-mono">{fmt(r.netRetainedLoss)}</TableCell>
                           <TableCell>
@@ -804,14 +804,14 @@ const RetrocessionModule = () => {
                         <TableCell className="text-xs">{programme?.programmeCode}<br />{layer?.name}</TableCell>
                         <TableCell>{rc.notificationDate}</TableCell>
                         <TableCell className="text-right font-mono">{fmt(rc.expectedRecovery)}</TableCell>
-                        <TableCell className="text-right font-mono text-green-600">{fmt(rc.settledRecovery)}</TableCell>
+                        <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{fmt(rc.settledRecovery)}</TableCell>
                         <TableCell>
                           <Badge variant={
                             rc.status === 'Settled' ? 'secondary' :
                             rc.status === 'Disputed' ? 'destructive' :
                             rc.status === 'Approved' ? 'default' : 'outline'
                           }>{rc.status}</Badge>
-                          {rc.disputeReason && <p className="text-xs text-red-600 mt-1">{rc.disputeReason}</p>}
+                          {rc.disputeReason && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{rc.disputeReason}</p>}
                         </TableCell>
                         <TableCell>
                           <div className="flex space-x-1">
@@ -883,8 +883,8 @@ const RetrocessionModule = () => {
           </div>
 
           {concentrationFlags(counterparties).map(m => (
-            <div key={m.id} className="flex items-start space-x-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950">
-              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <div key={m.id} className="flex items-start space-x-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 dark:bg-amber-950">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
               <p className="text-sm">
                 Concentration risk: <span className="font-medium">{m.name}</span> holds {m.concentrationPct.toFixed(1)}% of placed capacity — consider diversifying above the 40% threshold.
               </p>
@@ -908,7 +908,7 @@ const RetrocessionModule = () => {
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div><p className="text-muted-foreground">Capacity Used / Offered</p><p className="font-bold">{fmt(m.capacityUsed)} / {fmt(m.capacityOffered)}</p></div>
                     <div><p className="text-muted-foreground">Exposure (expected recoveries)</p><p className="font-bold">{fmt(m.exposure)}</p></div>
-                    <div><p className="text-muted-foreground">Outstanding Recoveries</p><p className="font-bold text-red-600">{fmt(m.outstandingRecoveries)}</p></div>
+                    <div><p className="text-muted-foreground">Outstanding Recoveries</p><p className="font-bold text-red-600 dark:text-red-400">{fmt(m.outstandingRecoveries)}</p></div>
                     <div><p className="text-muted-foreground">Recovery Speed</p><p className="font-bold">{m.recoverySpeedDays === null ? '—' : `${Math.round(m.recoverySpeedDays)} days avg`}</p></div>
                   </div>
                   <div>
@@ -1003,7 +1003,7 @@ const RetrocessionModule = () => {
                     <TableRow key={row.key}>
                       <TableCell className="font-medium">{row.key}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(row.grossExposure)}</TableCell>
-                      <TableCell className="text-right font-mono text-green-600">{fmt(row.protectedExposure)}</TableCell>
+                      <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{fmt(row.protectedExposure)}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(row.netExposure)}</TableCell>
                       <TableCell className="text-right font-mono">
                         {row.grossExposure > 0 ? `${((row.protectedExposure / row.grossExposure) * 100).toFixed(1)}%` : '—'}
@@ -1038,8 +1038,8 @@ const RetrocessionModule = () => {
                       <TableCell className="font-medium">{p.programmeCode}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(p.retroPremium)}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(p.commissionIncome)}</TableCell>
-                      <TableCell className="text-right font-mono text-green-600">{fmt(p.expectedRecoveries)}</TableCell>
-                      <TableCell className={`text-right font-mono ${p.netCost > 0 ? 'text-red-600' : 'text-green-600'}`}>{fmt(p.netCost)}</TableCell>
+                      <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{fmt(p.expectedRecoveries)}</TableCell>
+                      <TableCell className={`text-right font-mono ${p.netCost > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{fmt(p.netCost)}</TableCell>
                       <TableCell className="text-right font-mono">{p.recoveryRatio === null ? '—' : `${p.recoveryRatio.toFixed(1)}%`}</TableCell>
                       <TableCell className="text-right font-mono">{p.utilizationPct.toFixed(1)}%</TableCell>
                     </TableRow>
@@ -1061,13 +1061,13 @@ const RetrocessionModule = () => {
             </CardHeader>
             <CardContent className="space-y-2">
               {issues.length === 0 ? (
-                <div className="flex items-start space-x-2 p-3 rounded-lg bg-green-50 dark:bg-green-950">
-                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                <div className="flex items-start space-x-2 p-3 rounded-lg bg-green-50 dark:bg-green-950/40 dark:bg-green-950">
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
                   <p className="text-sm">All retrocession validations pass — programmes, placements, and retro claims are consistent.</p>
                 </div>
               ) : issues.map((issue, i) => (
-                <div key={i} className={`flex items-start space-x-2 p-3 rounded-lg ${issue.severity === 'error' ? 'bg-red-50 dark:bg-red-950' : 'bg-amber-50 dark:bg-amber-950'}`}>
-                  <AlertTriangle className={`h-4 w-4 mt-0.5 shrink-0 ${issue.severity === 'error' ? 'text-red-600' : 'text-amber-600'}`} />
+                <div key={i} className={`flex items-start space-x-2 p-3 rounded-lg ${issue.severity === 'error' ? 'bg-red-50 dark:bg-red-950/40 dark:bg-red-950' : 'bg-amber-50 dark:bg-amber-950/40 dark:bg-amber-950'}`}>
+                  <AlertTriangle className={`h-4 w-4 mt-0.5 shrink-0 ${issue.severity === 'error' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`} />
                   <div>
                     <p className="text-sm">{issue.message}</p>
                     <p className="text-xs text-muted-foreground">{issue.scope} · {issue.severity}</p>
@@ -1182,7 +1182,7 @@ const RetrocessionModule = () => {
 
             {/* ---- Live covered-business preview */}
             {(programmeForm.linesOfBusiness.length > 0 || programmeForm.linkedTreatyId) && (
-              <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 text-sm space-y-1">
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-950/40 dark:bg-blue-950 p-3 text-sm space-y-1">
                 <p className="font-medium">
                   {draftCoveredTreaties.length} inward {draftCoveredTreaties.length === 1 ? 'treaty falls' : 'treaties fall'} into this arrangement
                   · subject premium {programmeForm.currency} {fmt(draftSubjectPremium)}
@@ -1193,7 +1193,7 @@ const RetrocessionModule = () => {
                   </p>
                 ))}
                 {draftCoveredTreaties.length > 5 && <p className="text-xs text-muted-foreground">…and {draftCoveredTreaties.length - 5} more</p>}
-                {draftCoveredTreaties.length === 0 && <p className="text-xs text-red-600">Nothing matches yet — adjust the lines or coverage period.</p>}
+                {draftCoveredTreaties.length === 0 && <p className="text-xs text-red-600 dark:text-red-400">Nothing matches yet — adjust the lines or coverage period.</p>}
               </div>
             )}
 

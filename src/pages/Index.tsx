@@ -6,12 +6,12 @@ import { Link } from "react-router-dom";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-muted/50 flex items-center justify-center">
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
+        <h1 className="text-4xl font-bold text-foreground mb-4">
           Welcome to AfriReVision
         </h1>
-        <p className="text-xl text-gray-600 mb-8">
+        <p className="text-xl text-muted-foreground mb-8">
           East African Reinsurance Management Platform
         </p>
         <Link to="/dashboard">

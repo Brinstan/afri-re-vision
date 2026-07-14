@@ -80,17 +80,17 @@ const Dashboard = () => {
         return (
           <div className="space-y-6">
             {/* Integration Status Banner */}
-            <Card className="bg-gradient-to-r from-blue-50 to-green-50 border-blue-200">
+            <Card className="bg-gradient-to-r from-blue-50 dark:from-blue-950/40 to-green-50 dark:to-green-950/40 border-blue-200 dark:border-blue-900">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-blue-900">System Integration Active</h3>
-                    <p className="text-blue-700">All modules are now fully integrated with real-time data synchronization</p>
+                    <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200">System Integration Active</h3>
+                    <p className="text-blue-700 dark:text-blue-300">All modules are now fully integrated with real-time data synchronization</p>
                   </div>
                   <div className="flex space-x-2">
-                    <Badge className="bg-green-100 text-green-800">Underwriting ↔ Treaties</Badge>
-                    <Badge className="bg-green-100 text-green-800">Claims ↔ Treaties</Badge>
-                    <Badge className="bg-green-100 text-green-800">Accounting ↔ All</Badge>
+                    <Badge className="bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300">Underwriting ↔ Treaties</Badge>
+                    <Badge className="bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300">Claims ↔ Treaties</Badge>
+                    <Badge className="bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300">Accounting ↔ All</Badge>
                   </div>
                 </div>
               </CardContent>
@@ -107,7 +107,7 @@ const Dashboard = () => {
                   <CardContent>
                     <div className="text-2xl font-bold">{kpi.value}</div>
                     <p className="text-xs text-muted-foreground">
-                      <span className={kpi.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}>
+                      <span className={kpi.change.startsWith('+') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
                         {kpi.change}
                       </span>
                       {" "}from last month
@@ -155,7 +155,7 @@ const Dashboard = () => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {recentAlerts.map((alert, index) => (
-                    <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-slate-50">
+                    <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-muted/50">
                       <div className={`w-2 h-2 rounded-full mt-2 ${
                         alert.type === 'error' ? 'bg-red-500' : 
                         alert.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
@@ -168,7 +168,7 @@ const Dashboard = () => {
                   ))}
                   
                   <div className="border-t pt-3">
-                    <div className="flex items-center space-x-2 text-sm text-green-600">
+                    <div className="flex items-center space-x-2 text-sm text-green-600 dark:text-green-400">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <span>All modules synchronized - Real-time data flow active</span>
                     </div>
@@ -214,9 +214,9 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted/50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-card shadow-sm border-b">
         <div className="px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
@@ -224,18 +224,18 @@ const Dashboard = () => {
                 <BarChart3 className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">AfriReVision Platform</h1>
-                <p className="text-sm text-gray-600">Fully Integrated Reinsurance Management System</p>
+                <h1 className="text-xl font-bold text-foreground">AfriReVision Platform</h1>
+                <p className="text-sm text-muted-foreground">Fully Integrated Reinsurance Management System</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
               {user && (
                 <div className="text-right">
                   <p className="text-sm font-medium">{user.username}</p>
-                  <p className="text-xs text-gray-500">{user.userType}</p>
+                  <p className="text-xs text-muted-foreground">{user.userType}</p>
                 </div>
               )}
-              <Badge className="bg-green-100 text-green-800">Online</Badge>
+              <Badge className="bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300">Online</Badge>
               <Button variant="outline" size="sm" onClick={toggleTheme}>
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
@@ -253,7 +253,7 @@ const Dashboard = () => {
       </header>
 
       {/* Navigation */}
-      <nav className="bg-white border-b">
+      <nav className="bg-card border-b">
         <div className="px-6">
           <div className="flex space-x-8 overflow-x-auto">
             {[
@@ -272,8 +272,8 @@ const Dashboard = () => {
                 onClick={() => setActiveModule(item.id)}
                 className={`flex items-center space-x-2 px-3 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeModule === item.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-muted-foreground hover:text-foreground/90 hover:border-border'
                 }`}
               >
                 {item.icon}

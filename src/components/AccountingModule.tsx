@@ -49,7 +49,7 @@ const StatementTable = ({ title, lines, description }: { title: string; lines: S
           {lines.map((l, i) => (
             <TableRow key={i} className={l.emphasis ? 'font-bold border-t-2' : ''}>
               <TableCell>{l.label}</TableCell>
-              <TableCell className={`text-right font-mono ${l.amount < 0 ? 'text-red-600' : ''}`}>
+              <TableCell className={`text-right font-mono ${l.amount < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
                 {l.amount < 0 ? `(${fmt(Math.abs(l.amount))})` : fmt(l.amount)}
               </TableCell>
             </TableRow>
@@ -321,8 +321,8 @@ const AccountingModule = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Enterprise Accounting & Finance</h2>
-          <p className="text-gray-600">
+          <h2 className="text-2xl font-bold text-foreground">Enterprise Accounting & Finance</h2>
+          <p className="text-muted-foreground">
             {journals.length} journals auto-generated from operations · reporting in {fxRates.reportingCurrency}
           </p>
         </div>
@@ -367,7 +367,7 @@ const AccountingModule = () => {
                   {kpi.icon}
                 </CardHeader>
                 <CardContent>
-                  <div className={`text-2xl font-bold ${kpi.value < 0 ? 'text-red-600' : ''}`}>
+                  <div className={`text-2xl font-bold ${kpi.value < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
                     {fxRates.reportingCurrency} {fmtM(kpi.value)}
                   </div>
                   <p className="text-xs text-muted-foreground">{kpi.sub}</p>
@@ -602,7 +602,7 @@ const AccountingModule = () => {
               <Card key={bucket.label}>
                 <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{bucket.label}</CardTitle></CardHeader>
                 <CardContent>
-                  <div className={`text-xl font-bold ${bucket.label === '90+ days' && bucket.amount > 0 ? 'text-red-600' : ''}`}>
+                  <div className={`text-xl font-bold ${bucket.label === '90+ days' && bucket.amount > 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
                     {fmtM(bucket.amount)}
                   </div>
                 </CardContent>
@@ -637,7 +637,7 @@ const AccountingModule = () => {
                       </TableCell>
                       <TableCell className="text-right font-mono">{fmt(r.totalBooked)}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(r.totalPaid)}</TableCell>
-                      <TableCell className={`text-right font-mono ${r.outstanding > 0 ? 'text-red-600 font-medium' : ''}`}>{fmt(r.outstanding)}</TableCell>
+                      <TableCell className={`text-right font-mono ${r.outstanding > 0 ? 'text-red-600 dark:text-red-400 font-medium' : ''}`}>{fmt(r.outstanding)}</TableCell>
                       <TableCell>{r.daysOutstanding ?? '—'}</TableCell>
                       <TableCell><Badge variant="outline">{r.agingBucket}</Badge></TableCell>
                       <TableCell>
@@ -759,7 +759,7 @@ const AccountingModule = () => {
                       <TableCell><Badge variant="outline">{p.type}</Badge></TableCell>
                       <TableCell>{p.dueDate}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(p.amount)}</TableCell>
-                      <TableCell className="text-right font-mono text-red-600">{fmt(p.outstanding)}</TableCell>
+                      <TableCell className="text-right font-mono text-red-600 dark:text-red-400">{fmt(p.outstanding)}</TableCell>
                       <TableCell>
                         <Badge variant={p.status === 'Paid' ? 'secondary' : p.status === 'Partially Paid' ? 'default' : 'destructive'}>{p.status}</Badge>
                       </TableCell>
@@ -847,7 +847,7 @@ const AccountingModule = () => {
                         <TableCell>
                           <Badge variant={t.type === 'Receipt' ? 'secondary' : 'destructive'}>{t.type}</Badge>
                         </TableCell>
-                        <TableCell className={`text-right font-mono ${t.type === 'Payment' ? 'text-red-600' : 'text-green-600'}`}>
+                        <TableCell className={`text-right font-mono ${t.type === 'Payment' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                           {t.type === 'Payment' ? '-' : '+'}{fmt(t.amount)}
                         </TableCell>
                         <TableCell className="text-xs">{t.sourceModule}</TableCell>
@@ -921,7 +921,7 @@ const AccountingModule = () => {
                         <TableCell className="text-right font-mono">{fmt(e.outstandingForeign)}</TableCell>
                         <TableCell className="text-right font-mono">{fmt(e.atHistorical)}</TableCell>
                         <TableCell className="text-right font-mono">{fmt(e.atClosing)}</TableCell>
-                        <TableCell className={`text-right font-mono ${e.gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <TableCell className={`text-right font-mono ${e.gainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                           {e.gainLoss < 0 ? `(${fmt(Math.abs(e.gainLoss))})` : fmt(e.gainLoss)}
                         </TableCell>
                       </TableRow>
@@ -1000,7 +1000,7 @@ const AccountingModule = () => {
                       <TableCell className="text-xs">{bankAccounts.find(b => b.id === inv.bankAccountId)?.name ?? '—'}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(inv.amount)}</TableCell>
                       <TableCell className="text-right font-mono">{inv.expectedReturnRate}% ({fmt(inv.expectedReturnAmount)})</TableCell>
-                      <TableCell className="text-right font-mono text-green-600">{fmt(inv.actualReturns)}</TableCell>
+                      <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{fmt(inv.actualReturns)}</TableCell>
                       <TableCell>
                         <Badge variant={inv.riskLevel === 'Low' ? 'secondary' : inv.riskLevel === 'Medium' ? 'default' : 'destructive'}>{inv.riskLevel}</Badge>
                       </TableCell>

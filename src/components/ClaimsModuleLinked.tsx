@@ -320,8 +320,8 @@ const ClaimsModuleLinked = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Integrated Claims Management</h2>
-          <p className="text-gray-600">Claims processing with automatic treaty linking and premium booking</p>
+          <h2 className="text-2xl font-bold text-foreground">Integrated Claims Management</h2>
+          <p className="text-muted-foreground">Claims processing with automatic treaty linking and premium booking</p>
         </div>
       </div>
 
@@ -409,9 +409,9 @@ const ClaimsModuleLinked = () => {
                   </div>
 
                   {contractNumber && getTreatyByContractNumber(contractNumber) && (
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <h4 className="font-medium text-blue-900">Auto-Linked Treaty Information</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-800 mt-2">
+                    <div className="bg-blue-50 dark:bg-blue-950/40 p-4 rounded-lg">
+                      <h4 className="font-medium text-blue-900 dark:text-blue-200">Auto-Linked Treaty Information</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-800 dark:text-blue-300 mt-2">
                         <div>
                           <p><strong>Treaty:</strong> {getTreatyByContractNumber(contractNumber).treatyName}</p>
                           <p><strong>Cedant:</strong> {getTreatyByContractNumber(contractNumber).cedant}</p>
@@ -497,26 +497,26 @@ const ClaimsModuleLinked = () => {
                   </div>
 
                   {claimType === "XOL" && calculations && (
-                    <div className="bg-gray-50 p-6 rounded-lg space-y-4">
-                      <h4 className="font-medium text-gray-900 text-lg">Detailed XOL Claim Calculations</h4>
+                    <div className="bg-muted/50 p-6 rounded-lg space-y-4">
+                      <h4 className="font-medium text-foreground text-lg">Detailed XOL Claim Calculations</h4>
                       
                       {/* Summary Section */}
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white rounded border">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-card rounded border">
                         <div>
-                          <p className="text-sm text-gray-600">Total Claim</p>
+                          <p className="text-sm text-muted-foreground">Total Claim</p>
                           <p className="font-bold text-lg">{currency} {calculations.totalClaim.toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-600">Overall Deductible</p>
-                          <p className="font-bold text-lg text-red-600">{currency} {calculations.overallDeductible.toLocaleString()}</p>
+                          <p className="text-sm text-muted-foreground">Overall Deductible</p>
+                          <p className="font-bold text-lg text-red-600 dark:text-red-400">{currency} {calculations.overallDeductible.toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-600">Net After Deductible</p>
+                          <p className="text-sm text-muted-foreground">Net After Deductible</p>
                           <p className="font-bold text-lg">{currency} {calculations.netClaimAfterDeductible.toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-600">Total Payable</p>
-                          <p className="font-bold text-lg text-green-600">{currency} {calculations.totalPayable.toLocaleString()}</p>
+                          <p className="text-sm text-muted-foreground">Total Payable</p>
+                          <p className="font-bold text-lg text-green-600 dark:text-green-400">{currency} {calculations.totalPayable.toLocaleString()}</p>
                         </div>
                       </div>
 
@@ -525,9 +525,9 @@ const ClaimsModuleLinked = () => {
                         <h5 className="font-medium mb-3">Layer-wise Claim Distribution</h5>
                         <div className="space-y-3">
                           {calculations.layerDistribution.map((layer, index) => (
-                            <div key={index} className="border rounded-lg p-4 bg-white">
+                            <div key={index} className="border rounded-lg p-4 bg-card">
                               <div className="flex justify-between items-center mb-3">
-                                <h6 className="font-medium text-blue-900">{layer.layerName}</h6>
+                                <h6 className="font-medium text-blue-900 dark:text-blue-200">{layer.layerName}</h6>
                                 <Badge variant="outline">
                                   {layer.utilizationPercentage.toFixed(1)}% Utilized
                                 </Badge>
@@ -535,20 +535,20 @@ const ClaimsModuleLinked = () => {
                               
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                                 <div>
-                                  <p className="text-gray-600">Layer Limit</p>
+                                  <p className="text-muted-foreground">Layer Limit</p>
                                   <p className="font-medium">{currency} {layer.layerLimit.toLocaleString()}</p>
                                 </div>
                                 <div>
-                                  <p className="text-gray-600">Claim Amount</p>
+                                  <p className="text-muted-foreground">Claim Amount</p>
                                   <p className="font-medium">{currency} {layer.claimAmountNet.toLocaleString()}</p>
                                 </div>
                                 <div>
-                                  <p className="text-gray-600">Reinstatement ({layer.reinstatementRate}%)</p>
-                                  <p className="font-medium text-blue-600">{currency} {layer.reinstatementPremium.toLocaleString()}</p>
+                                  <p className="text-muted-foreground">Reinstatement ({layer.reinstatementRate}%)</p>
+                                  <p className="font-medium text-blue-600 dark:text-blue-400">{currency} {layer.reinstatementPremium.toLocaleString()}</p>
                                 </div>
                                 <div>
-                                  <p className="text-gray-600">Payable Amount</p>
-                                  <p className="font-medium text-green-600">{currency} {layer.payableAmount.toLocaleString()}</p>
+                                  <p className="text-muted-foreground">Payable Amount</p>
+                                  <p className="font-medium text-green-600 dark:text-green-400">{currency} {layer.payableAmount.toLocaleString()}</p>
                                 </div>
                               </div>
 
@@ -557,7 +557,7 @@ const ClaimsModuleLinked = () => {
                                   <span>Remaining Capacity:</span>
                                   <span className="font-medium">
                                     {currency} {layer.remainingCapacityAfter.toLocaleString()} 
-                                    <span className="text-gray-500 ml-1">
+                                    <span className="text-muted-foreground ml-1">
                                       (was {layer.remainingCapacityBefore.toLocaleString()})
                                     </span>
                                   </span>
@@ -569,19 +569,19 @@ const ClaimsModuleLinked = () => {
                       </div>
 
                       {/* Financial Summary */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-blue-50 rounded">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-blue-50 dark:bg-blue-950/40 rounded">
                         <div>
-                          <p className="text-sm text-blue-600">Total Reinstatement Premium</p>
-                          <p className="font-bold text-xl text-blue-900">{currency} {calculations.totalReinstatement.toLocaleString()}</p>
-                          <p className="text-xs text-blue-700">Will be auto-booked</p>
+                          <p className="text-sm text-blue-600 dark:text-blue-400">Total Reinstatement Premium</p>
+                          <p className="font-bold text-xl text-blue-900 dark:text-blue-200">{currency} {calculations.totalReinstatement.toLocaleString()}</p>
+                          <p className="text-xs text-blue-700 dark:text-blue-300">Will be auto-booked</p>
                         </div>
                         <div>
-                          <p className="text-sm text-purple-600">Expected Retro Recovery ({calculations.retroPercentage}%)</p>
-                          <p className="font-bold text-xl text-purple-900">{currency} {calculations.retroRecovery.toLocaleString()}</p>
+                          <p className="text-sm text-purple-600 dark:text-purple-400">Expected Retro Recovery ({calculations.retroPercentage}%)</p>
+                          <p className="font-bold text-xl text-purple-900 dark:text-purple-200">{currency} {calculations.retroRecovery.toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-orange-600">Net Exposure</p>
-                          <p className="font-bold text-xl text-orange-900">{currency} {calculations.netExposure.toLocaleString()}</p>
+                          <p className="text-sm text-orange-600 dark:text-orange-400">Net Exposure</p>
+                          <p className="font-bold text-xl text-orange-900 dark:text-orange-200">{currency} {calculations.netExposure.toLocaleString()}</p>
                         </div>
                       </div>
                     </div>
@@ -651,7 +651,7 @@ const ClaimsModuleLinked = () => {
                           <TableCell>{claim.insuredName}</TableCell>
                           <TableCell>{claim.currency} {claim.claimAmount.toLocaleString()}</TableCell>
                           <TableCell>
-                            <span className="text-green-600 font-medium">
+                            <span className="text-green-600 dark:text-green-400 font-medium">
                               {claim.currency} {(claim.retroRecovery || 0).toLocaleString()}
                             </span>
                           </TableCell>
@@ -809,10 +809,10 @@ const ClaimsModuleLinked = () => {
                           <TableCell>{claim.insuredName}</TableCell>
                           <TableCell>{claim.currency} {claim.claimAmount.toLocaleString()}</TableCell>
                           <TableCell>
-                            <span className="text-green-600 font-medium">
+                            <span className="text-green-600 dark:text-green-400 font-medium">
                               {claim.currency} {retroRecovery.toLocaleString()}
                             </span>
-                            <p className="text-xs text-gray-500">Auto-calculated</p>
+                            <p className="text-xs text-muted-foreground">Auto-calculated</p>
                           </TableCell>
                           <TableCell>
                             <span className="font-medium">
@@ -935,19 +935,19 @@ const ClaimsModuleLinked = () => {
                           </div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                             <div>
-                              <p className="text-gray-600">Claim Amount</p>
+                              <p className="text-muted-foreground">Claim Amount</p>
                               <p className="font-medium">{selectedClaim.currency} {layer.claimAmountNet.toLocaleString()}</p>
                             </div>
                             <div>
-                              <p className="text-gray-600">Payable</p>
-                              <p className="font-medium text-green-600">{selectedClaim.currency} {layer.payableAmount.toLocaleString()}</p>
+                              <p className="text-muted-foreground">Payable</p>
+                              <p className="font-medium text-green-600 dark:text-green-400">{selectedClaim.currency} {layer.payableAmount.toLocaleString()}</p>
                             </div>
                             <div>
-                              <p className="text-gray-600">Reinstatement</p>
-                              <p className="font-medium text-blue-600">{selectedClaim.currency} {layer.reinstatementPremium.toLocaleString()}</p>
+                              <p className="text-muted-foreground">Reinstatement</p>
+                              <p className="font-medium text-blue-600 dark:text-blue-400">{selectedClaim.currency} {layer.reinstatementPremium.toLocaleString()}</p>
                             </div>
                             <div>
-                              <p className="text-gray-600">Remaining Capacity</p>
+                              <p className="text-muted-foreground">Remaining Capacity</p>
                               <p className="font-medium">{selectedClaim.currency} {layer.remainingCapacityAfter.toLocaleString()}</p>
                             </div>
                           </div>

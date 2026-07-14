@@ -224,8 +224,8 @@ const ActuarialEngine = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Actuarial Reserving Workbench</h2>
-          <p className="text-gray-600">Live reserving computations from {claims.length} claims and {treaties.length} treaties in the system</p>
+          <h2 className="text-2xl font-bold text-foreground">Actuarial Reserving Workbench</h2>
+          <p className="text-muted-foreground">Live reserving computations from {claims.length} claims and {treaties.length} treaties in the system</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={exportAllTriangles}>
@@ -557,13 +557,13 @@ const ActuarialEngine = () => {
                     const diff = m.totals.ultimate - methods.chainLadder.totals.ultimate;
                     const isSelected = assumptions.selectedMethod === m.method;
                     return (
-                      <TableRow key={m.method} className={isSelected ? 'bg-blue-50 dark:bg-blue-950' : ''}>
+                      <TableRow key={m.method} className={isSelected ? 'bg-blue-50 dark:bg-blue-950/40 dark:bg-blue-950' : ''}>
                         <TableCell className="font-medium">{METHOD_LABELS[m.method]}</TableCell>
                         <TableCell className="text-right font-mono">{fmt(m.totals.ultimate)}</TableCell>
                         <TableCell className="text-right font-mono">{fmt(m.totals.ibnr)}</TableCell>
                         <TableCell className="text-right font-mono">{fmt(m.totals.rbns)}</TableCell>
                         <TableCell className="text-right font-mono">{fmt(m.totals.reserve)}</TableCell>
-                        <TableCell className={`text-right font-mono ${diff > 0 ? 'text-red-600' : diff < 0 ? 'text-green-600' : ''}`}>
+                        <TableCell className={`text-right font-mono ${diff > 0 ? 'text-red-600 dark:text-red-400' : diff < 0 ? 'text-green-600 dark:text-green-400' : ''}`}>
                           {diff === 0 ? '—' : `${diff > 0 ? '+' : ''}${fmt(diff)}`}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground max-w-56">{m.assumptionsNote}</TableCell>
@@ -714,10 +714,10 @@ const ActuarialEngine = () => {
                   flags.push({ level: 'warn', text: `Accident year ${r.origin} ultimate loss ratio exceeds 100% (${((r.ultimate / r.premium) * 100).toFixed(0)}%) — potential reserve strengthening or under-pricing.` }));
                 if (flags.length === 0) flags.push({ level: 'ok', text: 'No unusual development or adequacy flags for the current selection.' });
                 return flags.map((f, i) => (
-                  <div key={i} className={`flex items-start space-x-2 p-3 rounded-lg ${f.level === 'warn' ? 'bg-amber-50 dark:bg-amber-950' : 'bg-green-50 dark:bg-green-950'}`}>
+                  <div key={i} className={`flex items-start space-x-2 p-3 rounded-lg ${f.level === 'warn' ? 'bg-amber-50 dark:bg-amber-950/40 dark:bg-amber-950' : 'bg-green-50 dark:bg-green-950/40 dark:bg-green-950'}`}>
                     {f.level === 'warn'
-                      ? <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-                      : <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />}
+                      ? <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                      : <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />}
                     <p className="text-sm">{f.text}</p>
                   </div>
                 ));
@@ -749,19 +749,19 @@ const ActuarialEngine = () => {
                   </div>
                   <div>
                     <p className="text-muted-foreground">Reinsurer Share</p>
-                    <p className="font-bold text-blue-600">{fmt(t.reinsurerShare)}</p>
+                    <p className="font-bold text-blue-600 dark:text-blue-400">{fmt(t.reinsurerShare)}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Retro Recovery</p>
-                    <p className="font-bold text-purple-600">{fmt(t.retroRecovery)}</p>
+                    <p className="font-bold text-purple-600 dark:text-purple-400">{fmt(t.retroRecovery)}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Net Retention</p>
-                    <p className="font-bold text-orange-600">{fmt(t.netRetention)}</p>
+                    <p className="font-bold text-orange-600 dark:text-orange-400">{fmt(t.netRetention)}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Reinstatement Premiums</p>
-                    <p className="font-bold text-green-600">{fmt(t.reinstatementPremiums)}</p>
+                    <p className="font-bold text-green-600 dark:text-green-400">{fmt(t.reinstatementPremiums)}</p>
                   </div>
                 </div>
                 <div className="space-y-2">
