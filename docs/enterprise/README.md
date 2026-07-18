@@ -15,6 +15,11 @@ AfriReVision from the working client-side platform to a production system.
 | 8 | [DevOps](./08-DEVOPS.md) |
 | 9 | [Coding Standards](./09-CODING_STANDARDS.md) |
 | 10 | [AI Development Handoff Blueprint](./10-AI_DEV_BLUEPRINT.md) |
+| 11 | [Critical Gap Analysis](./11-GAP_ANALYSIS.md) — honest audit + missing industry-standard modules |
+| 12 | [Product Overview](./12-PRODUCT_OVERVIEW.md) — for users, stakeholders, and testing agents |
+
+**Word versions:** every document above is also generated as `.docx` in
+[`./docx/`](./docx/) for circulation to users, the team, and testers.
 
 Already implemented in this repo (not future work): all nine business modules,
 the pure calculation engines, and **feature-based access control** — an
