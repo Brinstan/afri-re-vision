@@ -3,22 +3,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from './AuthContext';
+import { useUserStore } from './UserStore';
 import { LogIn, Building } from 'lucide-react';
 
 const LoginForm = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [userType, setUserType] = useState<'Finance' | 'Operations' | ''>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   const { login } = useAuth();
+  const showSeedHint = useUserStore(s => s.users.some(u => u.username === 'admin' && u.passwordHash === ''));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password || !userType) {
+    if (!username || !password) {
       setError('Please fill in all fields');
       return;
     }
@@ -27,9 +27,9 @@ const LoginForm = () => {
     setError('');
 
     try {
-      const success = await login(username, password, userType as 'Finance' | 'Operations');
+      const success = await login(username, password);
       if (!success) {
-        setError('Invalid credentials');
+        setError('Invalid credentials or inactive account');
       }
     } catch (err) {
       setError('Login failed. Please try again.');
@@ -39,7 +39,7 @@ const LoginForm = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 dark:from-blue-950/40 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 dark:from-blue-950/40 to-indigo-100 dark:to-indigo-950/40 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto bg-blue-600 rounded-full p-3 w-16 h-16 flex items-center justify-center mb-4">
@@ -53,19 +53,6 @@ const LoginForm = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="userType">User Type</Label>
-              <Select value={userType} onValueChange={(value: 'Finance' | 'Operations') => setUserType(value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select user type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Finance">Finance</SelectItem>
-                  <SelectItem value="Operations">Operations</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
               <Input
                 id="username"
@@ -73,6 +60,7 @@ const LoginForm = () => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter your username"
+                autoComplete="username"
                 required
               />
             </div>
@@ -85,6 +73,7 @@ const LoginForm = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
+                autoComplete="current-password"
                 required
               />
             </div>
@@ -103,6 +92,13 @@ const LoginForm = () => {
                 </>
               )}
             </Button>
+
+            {showSeedHint && (
+              <p className="text-xs text-muted-foreground text-center">
+                First run: sign in as <span className="font-mono">admin / admin123</span> and
+                change the password under Administration.
+              </p>
+            )}
           </form>
         </CardContent>
       </Card>

@@ -2,6 +2,32 @@
 
 All notable changes, by delivered stage. Commits are on `main`.
 
+## Stage 7 — Feature-Based Access Control + Enterprise Blueprint
+
+**Access control (implemented):**
+- `src/access/permissions.ts` — module catalogue (10 features), role templates
+  (System Administrator, Underwriter, Claims Officer, Accountant, Actuary,
+  Finance Manager, Executive, Custom), SHA-256 password hashing helpers.
+- `src/components/UserStore.tsx` — persisted user registry
+  (`afrirevision-users`, survives business-data reset); seeded administrator
+  (admin/admin123, flagged until password changed); authenticate/add/update/
+  setPassword/remove with guards.
+- `AuthContext` rewritten — sessions map to live registry accounts (stale or
+  deactivated sessions are invalidated); `hasModule()`; `refreshSession()`.
+- `LoginForm` — real credential check (no more "any password"); first-run hint.
+- **Administration module** (`AdminModule.tsx`) — user table, per-user module
+  grants via role template + checkbox tailoring, access matrix view, password
+  management, activate/deactivate. Guards: cannot remove own admin access,
+  cannot deactivate/delete self or the last administrator.
+- Dashboard navigation, content routing, and quick actions all filter to the
+  signed-in user's granted modules; revoked access falls back gracefully.
+
+**Enterprise blueprint (docs/enterprise/, 10 documents):** business analysis,
+PRD (MoSCoW), architecture incl. the 13-layer production stack, database
+design (DDL + RLS + audit), UI/UX, roadmap (3 releases, 7-sprint MVP),
+testing strategy, DevOps, coding standards, and an AI development handoff
+blueprint for the backend build.
+
 ## Dark-mode overhaul (post-6B polish)
 
 Resolved TECH_DEBT #17 — professional dark mode across the whole app.

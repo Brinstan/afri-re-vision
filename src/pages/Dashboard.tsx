@@ -17,12 +17,14 @@ import TreatyManagementIntegrated from "../components/TreatyManagementIntegrated
 import UnderwritingModuleIntegrated from "../components/UnderwritingModuleIntegrated";
 import IfrsReporting from "../components/IfrsReporting";
 import RetrocessionModule from "../components/RetrocessionModule";
+import AdminModule from "../components/AdminModule";
+import { UserCog } from "lucide-react";
 
 const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("dashboard");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, hasModule } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { treaties, claims, resetData } = useDataStore();
 
@@ -58,8 +60,40 @@ const Dashboard = () => {
     { type: "error", message: "Payment overdue: Retro Commission USD 150K", time: "1 day ago" }
   ];
 
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="h-4 w-4" /> },
+    { id: 'underwriting', label: 'Underwriting', icon: <Building className="h-4 w-4" /> },
+    { id: 'actuarial', label: 'Actuarial Engine', icon: <Calculator className="h-4 w-4" /> },
+    { id: 'pricing', label: 'Pricing', icon: <TrendingUp className="h-4 w-4" /> },
+    { id: 'accounting', label: 'Accounting', icon: <DollarSign className="h-4 w-4" /> },
+    { id: 'claims', label: 'Claims', icon: <FileText className="h-4 w-4" /> },
+    { id: 'treaties', label: 'Treaties', icon: <Users className="h-4 w-4" /> },
+    { id: 'retrocession', label: 'Retrocession', icon: <Shield className="h-4 w-4" /> },
+    { id: 'ifrs', label: 'IFRS 17', icon: <BookOpen className="h-4 w-4" /> },
+    { id: 'admin', label: 'Administration', icon: <UserCog className="h-4 w-4" /> }
+  ].filter(item => hasModule(item.id));
+
+  // If access to the open module is revoked mid-session, fall back to the first granted one.
+  React.useEffect(() => {
+    if (!hasModule(activeModule) && navItems.length > 0) {
+      setActiveModule(navItems[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, activeModule]);
+
   const renderMainContent = () => {
+    if (!hasModule(activeModule)) {
+      return (
+        <Card>
+          <CardContent className="p-8 text-center text-muted-foreground">
+            You do not have access to this module. Contact your system administrator.
+          </CardContent>
+        </Card>
+      );
+    }
     switch(activeModule) {
+      case "admin":
+        return <AdminModule />;
       case "actuarial":
         return <ActuarialEngine />;
       case "pricing":
@@ -125,26 +159,36 @@ const Dashboard = () => {
                   <CardDescription>Cross-module operations with automatic data linking</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button onClick={() => setActiveModule("underwriting")} className="w-full justify-start">
-                    <Building className="mr-2 h-4 w-4" />
-                    New Underwriting Contract → Auto-Convert to Treaty
-                  </Button>
-                  <Button onClick={() => setActiveModule("claims")} variant="outline" className="w-full justify-start">
-                    <FileText className="mr-2 h-4 w-4" />
-                    Process Claim → Auto-Link to Treaty & Book Reinstatement
-                  </Button>
-                  <Button onClick={() => setActiveModule("treaties")} variant="outline" className="w-full justify-start">
-                    <DollarSign className="mr-2 h-4 w-4" />
-                    Book Premium → Update Accounting & Payment Status
-                  </Button>
-                  <Button onClick={() => setActiveModule("actuarial")} variant="outline" className="w-full justify-start">
-                    <Calculator className="mr-2 h-4 w-4" />
-                    Run Actuarial Calculations
-                  </Button>
-                  <Button onClick={() => setActiveModule("ifrs")} variant="outline" className="w-full justify-start">
-                    <BookOpen className="mr-2 h-4 w-4" />
-                    Generate IFRS 17 Report
-                  </Button>
+                  {hasModule("underwriting") && (
+                    <Button onClick={() => setActiveModule("underwriting")} className="w-full justify-start">
+                      <Building className="mr-2 h-4 w-4" />
+                      New Underwriting Contract → Auto-Convert to Treaty
+                    </Button>
+                  )}
+                  {hasModule("claims") && (
+                    <Button onClick={() => setActiveModule("claims")} variant="outline" className="w-full justify-start">
+                      <FileText className="mr-2 h-4 w-4" />
+                      Process Claim → Auto-Link to Treaty & Book Reinstatement
+                    </Button>
+                  )}
+                  {hasModule("treaties") && (
+                    <Button onClick={() => setActiveModule("treaties")} variant="outline" className="w-full justify-start">
+                      <DollarSign className="mr-2 h-4 w-4" />
+                      Book Premium → Update Accounting & Payment Status
+                    </Button>
+                  )}
+                  {hasModule("actuarial") && (
+                    <Button onClick={() => setActiveModule("actuarial")} variant="outline" className="w-full justify-start">
+                      <Calculator className="mr-2 h-4 w-4" />
+                      Run Actuarial Calculations
+                    </Button>
+                  )}
+                  {hasModule("ifrs") && (
+                    <Button onClick={() => setActiveModule("ifrs")} variant="outline" className="w-full justify-start">
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      Generate IFRS 17 Report
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
 
@@ -231,8 +275,8 @@ const Dashboard = () => {
             <div className="flex items-center space-x-4">
               {user && (
                 <div className="text-right">
-                  <p className="text-sm font-medium">{user.username}</p>
-                  <p className="text-xs text-muted-foreground">{user.userType}</p>
+                  <p className="text-sm font-medium">{user.displayName || user.username}</p>
+                  <p className="text-xs text-muted-foreground">{user.role}</p>
                 </div>
               )}
               <Badge className="bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300">Online</Badge>
@@ -256,17 +300,7 @@ const Dashboard = () => {
       <nav className="bg-card border-b">
         <div className="px-6">
           <div className="flex space-x-8 overflow-x-auto">
-            {[
-              { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="h-4 w-4" /> },
-              { id: 'underwriting', label: 'Underwriting', icon: <Building className="h-4 w-4" /> },
-              { id: 'actuarial', label: 'Actuarial Engine', icon: <Calculator className="h-4 w-4" /> },
-              { id: 'pricing', label: 'Pricing', icon: <TrendingUp className="h-4 w-4" /> },
-              { id: 'accounting', label: 'Accounting', icon: <DollarSign className="h-4 w-4" /> },
-              { id: 'claims', label: 'Claims', icon: <FileText className="h-4 w-4" /> },
-              { id: 'treaties', label: 'Treaties', icon: <Users className="h-4 w-4" /> },
-              { id: 'retrocession', label: 'Retrocession', icon: <Shield className="h-4 w-4" /> },
-              { id: 'ifrs', label: 'IFRS 17', icon: <BookOpen className="h-4 w-4" /> }
-            ].map((item) => (
+            {navItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => setActiveModule(item.id)}
@@ -299,8 +333,8 @@ const Dashboard = () => {
           <div className="space-y-4">
             {user && (
               <div className="rounded-lg border p-3 text-sm">
-                <p className="font-medium">{user.username}</p>
-                <p className="text-muted-foreground">{user.userType} user</p>
+                <p className="font-medium">{user.displayName || user.username}</p>
+                <p className="text-muted-foreground">{user.role} · {user.modules.length} module(s) granted</p>
               </div>
             )}
             <div className="flex items-center justify-between rounded-lg border p-3">
