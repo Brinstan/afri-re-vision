@@ -18,7 +18,8 @@ import UnderwritingModuleIntegrated from "../components/UnderwritingModuleIntegr
 import IfrsReporting from "../components/IfrsReporting";
 import RetrocessionModule from "../components/RetrocessionModule";
 import AdminModule from "../components/AdminModule";
-import { UserCog } from "lucide-react";
+import { UserCog, Download, Upload } from "lucide-react";
+import { createBackup, validateBackup, applyBackup, backupFilename, BackupFile } from "../lib/backup";
 
 const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("dashboard");
@@ -26,13 +27,60 @@ const Dashboard = () => {
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const { user, logout, hasModule } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { treaties, claims, resetData } = useDataStore();
+  const { treaties, claims, resetData, approvals, decideApproval } = useDataStore();
+  const pendingApprovals = approvals.filter(a => a.status === 'Pending');
+
+  const handleDecide = (id: string, approve: boolean) => {
+    const err = decideApproval(id, approve);
+    if (err) toast.error(err);
+    else toast.success(approve ? "Approved — the payment has been executed" : "Rejected");
+  };
 
   const handleResetData = () => {
     resetData();
     setResetConfirmOpen(false);
     setSettingsOpen(false);
     toast.success("Application data has been reset to its initial state");
+  };
+
+  const handleBackup = () => {
+    const backup = createBackup(user?.username ?? 'unknown');
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = backupFilename();
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Backup downloaded — keep it somewhere safe");
+  };
+
+  const restoreInputRef = React.useRef<HTMLInputElement>(null);
+  const [pendingRestore, setPendingRestore] = useState<{ backup: BackupFile; summary: string[] } | null>(null);
+
+  const handleRestoreFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      const check = validateBackup(parsed);
+      if (!check.ok) {
+        toast.error(`Backup rejected: ${check.errors[0]}`);
+        return;
+      }
+      setPendingRestore({ backup: parsed as BackupFile, summary: check.summary });
+    } catch {
+      toast.error("Could not read the file — is it a valid AfriReVision backup?");
+    }
+  };
+
+  const handleConfirmRestore = () => {
+    if (!pendingRestore) return;
+    applyBackup(pendingRestore.backup);
+    setPendingRestore(null);
+    toast.success("Backup restored — reloading");
+    setTimeout(() => window.location.reload(), 600);
   };
 
   const formatAmount = (amount: number) =>
@@ -129,6 +177,41 @@ const Dashboard = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Maker-checker approvals inbox */}
+            {pendingApprovals.length > 0 && (
+              <Card className="border-yellow-300 dark:border-yellow-800">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                    Pending Approvals ({pendingApprovals.length})
+                  </CardTitle>
+                  <CardDescription>
+                    Money-moving actions await a second pair of eyes — requesters cannot approve their own items
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {pendingApprovals.map(a => (
+                    <div key={a.id} className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <p className="text-sm font-medium">{a.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {a.type} · {a.currency} {a.amount.toLocaleString()} · requested by {a.requestedBy} · {new Date(a.requestedAt).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => handleDecide(a.id, true)} disabled={a.requestedBy === user?.username}>
+                          Approve
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleDecide(a.id, false)} disabled={a.requestedBy === user?.username}>
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -346,6 +429,23 @@ const Dashboard = () => {
                 Switch to {theme === 'dark' ? 'light' : 'dark'} mode
               </Button>
             </div>
+            <div className="rounded-lg border p-3 space-y-2">
+              <div>
+                <p className="text-sm font-medium">Backup &amp; Restore</p>
+                <p className="text-xs text-muted-foreground">
+                  Full snapshot: business data, user accounts, assumptions and settings
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleBackup}>
+                  <Download className="h-3 w-3 mr-2" /> Download Backup
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => restoreInputRef.current?.click()}>
+                  <Upload className="h-3 w-3 mr-2" /> Restore Backup
+                </Button>
+                <input ref={restoreInputRef} type="file" accept=".json,application/json" className="hidden" onChange={handleRestoreFile} />
+              </div>
+            </div>
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
                 <p className="text-sm font-medium">Application Data</p>
@@ -363,6 +463,30 @@ const Dashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Restore Confirmation */}
+      <AlertDialog open={!!pendingRestore} onOpenChange={o => !o && setPendingRestore(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restore this backup?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p>This replaces ALL current data — business records, user accounts and settings — with the backup contents:</p>
+                <ul className="mt-2 list-disc pl-5 text-sm">
+                  {pendingRestore?.summary.map((s, i) => <li key={i}>{s}</li>)}
+                </ul>
+                <p className="mt-2">Consider downloading a backup of the current state first. This cannot be undone.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmRestore} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Restore
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Reset Data Confirmation */}
       <AlertDialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>

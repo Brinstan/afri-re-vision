@@ -215,6 +215,26 @@ export interface RetroClaim {
 }
 
 /** Imported historical experience (from CSV/Excel) used by the Pricing System. */
+/**
+ * Maker-checker (G-07): money-moving actions are requested by one user and
+ * must be approved by a DIFFERENT user before the underlying mutation runs.
+ */
+export interface ApprovalRequest {
+  id: string;
+  type: 'Claim Payment' | 'Premium Booking Paid';
+  /** Claim id, or `${treatyId}:${bookingId}` for bookings. */
+  entityId: string;
+  description: string;
+  amount: number;
+  currency: string;
+  requestedBy: string;
+  requestedAt: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  decidedBy?: string;
+  decidedAt?: string;
+  comment?: string;
+}
+
 export interface ExternalExperienceRow {
   id: string;
   source: string;                  // file name it came from
@@ -293,6 +313,11 @@ interface DataStore {
   importExternalExperience: (rows: ExternalExperienceRow[], source: string) => void;
   clearExternalExperience: () => void;
 
+  // Maker-checker approvals
+  approvals: ApprovalRequest[];
+  requestApproval: (input: Omit<ApprovalRequest, 'id' | 'requestedBy' | 'requestedAt' | 'status'>) => string | null;
+  decideApproval: (id: string, approve: boolean, comment?: string) => string | null;
+
   // Audit trail
   logAudit: (entry: Omit<AuditEntry, 'id' | 'timestamp' | 'user'>) => void;
 
@@ -314,8 +339,9 @@ const auditEntry = (entry: Omit<AuditEntry, 'id' | 'timestamp' | 'user'>): Audit
   ...entry
 });
 
-const initialData: Pick<DataStore, 'treaties' | 'claims' | 'underwritingContracts' | 'investments' | 'bankAccounts' | 'manualJournals' | 'auditLog' | 'retroProgrammes' | 'retroClaims' | 'retrocessionaires' | 'externalExperience'> = {
+const initialData: Pick<DataStore, 'treaties' | 'claims' | 'underwritingContracts' | 'investments' | 'bankAccounts' | 'manualJournals' | 'auditLog' | 'retroProgrammes' | 'retroClaims' | 'retrocessionaires' | 'externalExperience' | 'approvals'> = {
   externalExperience: [],
+  approvals: [],
   treaties: [
     {
       id: '1',
@@ -787,6 +813,70 @@ export const useDataStore = create<DataStore>()(persist((set, get) => ({
       sourceModule: 'Pricing', previousValue: `${state.externalExperience.length} rows`, newValue: 'cleared'
     })]
   })),
+
+  // Maker-checker approvals ---------------------------------------------
+  requestApproval: (input) => {
+    const state = get();
+    // one pending request per entity at a time
+    if (state.approvals.some(a => a.entityId === input.entityId && a.status === 'Pending')) {
+      return 'An approval for this item is already pending';
+    }
+    const request: ApprovalRequest = {
+      ...input,
+      id: `APR-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      requestedBy: currentUser(),
+      requestedAt: new Date().toISOString(),
+      status: 'Pending',
+    };
+    set(s => ({
+      approvals: [...s.approvals, request],
+      auditLog: [...s.auditLog, auditEntry({
+        action: 'REQUEST', entity: 'Approval', entityId: request.id,
+        sourceModule: 'Approvals', newValue: `${request.type}: ${request.description} (${request.currency} ${request.amount.toLocaleString()})`
+      })]
+    }));
+    return null;
+  },
+
+  decideApproval: (id, approve, comment) => {
+    const state = get();
+    const request = state.approvals.find(a => a.id === id);
+    if (!request || request.status !== 'Pending') return 'Approval not found or already decided';
+    const decider = currentUser();
+    if (decider === request.requestedBy) {
+      return 'Four-eyes rule: you cannot approve your own request';
+    }
+
+    set(s => {
+      let treaties = s.treaties;
+      let claims = s.claims;
+      if (approve) {
+        if (request.type === 'Claim Payment') {
+          claims = s.claims.map(c => c.id === request.entityId
+            ? { ...c, status: 'Full Payment', paidAmount: c.claimAmount, paymentDate: new Date().toISOString().split('T')[0], paymentReference: request.id }
+            : c);
+        } else if (request.type === 'Premium Booking Paid') {
+          const [treatyId, bookingId] = request.entityId.split(':');
+          treaties = s.treaties.map(t => t.id === treatyId
+            ? { ...t, premiumBookings: t.premiumBookings?.map(b => b.id === bookingId ? { ...b, status: 'Paid' as const, paidAmount: b.amount } : b) }
+            : t);
+        }
+      }
+      return {
+        treaties, claims,
+        approvals: s.approvals.map(a => a.id === id
+          ? { ...a, status: approve ? 'Approved' as const : 'Rejected' as const, decidedBy: decider, decidedAt: new Date().toISOString(), comment }
+          : a),
+        auditLog: [...s.auditLog, auditEntry({
+          action: approve ? 'APPROVE' : 'REJECT', entity: 'Approval', entityId: id,
+          sourceModule: 'Approvals',
+          previousValue: `requested by ${request.requestedBy}`,
+          newValue: `${request.type}: ${request.description}${comment ? ` — ${comment}` : ''}`
+        })]
+      };
+    });
+    return null;
+  },
 
   // Audit trail
   logAudit: (entry) => set((state) => ({

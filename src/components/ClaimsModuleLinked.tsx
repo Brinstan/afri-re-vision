@@ -43,7 +43,8 @@ const ClaimsModuleLinked = () => {
     addClaim,
     updateClaim,
     updateTreaty,
-    addPremiumBooking
+    addPremiumBooking,
+    requestApproval
   } = useDataStore();
 
   // Generate standardized claim reference number
@@ -263,9 +264,18 @@ const ClaimsModuleLinked = () => {
     toast.success(`${title} downloaded`);
   };
 
+  // Maker-checker (G-07): payment is requested here and executed only when a
+  // different user approves it from the Dashboard approvals inbox.
   const handlePayClaim = (claim) => {
-    updateClaim(claim.id, { status: 'Full Payment' });
-    toast.success(`Claim ${claim.claimNumber} marked as fully paid`);
+    const err = requestApproval({
+      type: 'Claim Payment',
+      entityId: claim.id,
+      description: `Pay claim ${claim.claimNumber} (${claim.insuredName})`,
+      amount: claim.claimAmount,
+      currency: claim.currency,
+    });
+    if (err) toast.error(err);
+    else toast.success(`Payment of ${claim.claimNumber} submitted for approval`);
   };
 
   // Edit claim functionality

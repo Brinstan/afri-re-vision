@@ -2,6 +2,32 @@
 
 All notable changes, by delivered stage. Commits are on `main`.
 
+## Stage 8 — Gap Remediation Sprint 1 (from Phase 11 Gap Analysis)
+
+- **G-03 · Engine test suites** — Vitest harness (`npm test`); 62 tests across
+  9 files covering actuarial (golden triangle → Chain Ladder/BF/ELR/Cape Cod
+  identities, Mack), IFRS 17 (LRC/LIC/RA invariants, GMM loss component),
+  accounting (journal balance, stable ids, TB debits=credits, FX round-trip),
+  retrocession (LOB auto-coverage, QS/XOL recovery bases, placement=100%),
+  pricing (loss mapping, burning cost, credibility Z, build-up reconciliation,
+  CSV parsing), access control, backup, and maker-checker.
+- **G-05 · Backup & restore** — Settings now exports a full JSON snapshot
+  (business data + user accounts + assumptions) and restores it with
+  validation (format, corruption, admin-lockout guard) and confirmation.
+- **G-07 · Maker-checker** — claim payments and premium-booking payments now
+  create Pending approvals instead of executing; a Dashboard approvals inbox
+  lets a DIFFERENT user approve/reject (four-eyes enforced in the store,
+  audited, duplicate-pending blocked).
+- **G-08 · Retro consistency** — IFRS 17 Reinsurance Held now uses programme
+  layer premiums (earned) and engine-computed recoveries whenever programmes
+  exist, matching the accounting basis (TECH_DEBT #28 resolved).
+- **G-09 · Reinstatement premiums** — settling an XOL/Cat retro recovery books
+  a pro-rata reinstatement premium journal (`JN-RIP-*`) at the programme's
+  reinstatement rate (TECH_DEBT #30 resolved).
+- **G-12 · Native Excel** — SheetJS added: pricing experience import accepts
+  .xlsx/.xls directly; IFRS 17 and Finance "Excel Analysis" exports now
+  produce real .xlsx workbooks.
+
 ## Stage 7 — Feature-Based Access Control + Enterprise Blueprint
 
 **Access control (implemented):**

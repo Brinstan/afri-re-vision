@@ -48,7 +48,8 @@ const TreatyManagementIntegrated = () => {
     getTreatyByContractNumber,
     getClaimsByTreaty,
     addPremiumBooking,
-    updatePremiumPaymentStatus
+    updatePremiumPaymentStatus,
+    requestApproval
   } = useDataStore();
 
   // Derive the selected treaty from the store so the dialog reflects live updates
@@ -140,10 +141,18 @@ const TreatyManagementIntegrated = () => {
     setIsViewDialogOpen(true);
   };
 
+  // Maker-checker (G-07): marking a booking paid requires a second user's approval.
   const handleMarkBookingPaid = (bookingId: string, amount: number) => {
     if (!selectedTreaty) return;
-    updatePremiumPaymentStatus(selectedTreaty.id, bookingId, 'Paid', amount);
-    toast.success("Booking marked as fully paid");
+    const err = requestApproval({
+      type: 'Premium Booking Paid',
+      entityId: `${selectedTreaty.id}:${bookingId}`,
+      description: `Mark booking ${bookingId} paid on ${selectedTreaty.treatyName}`,
+      amount,
+      currency: selectedTreaty.currency,
+    });
+    if (err) toast.error(err);
+    else toast.success("Payment submitted for approval");
   };
 
   // Monthly returns: live calculated ratios

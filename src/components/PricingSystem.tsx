@@ -25,6 +25,7 @@ import { validatePricing } from '@/pricing/validation';
 import { rateAdequacyByLob } from '@/pricing/analytics';
 import { exportPricingCsv, exportPricingMemoPdf } from '@/pricing/reporting';
 import { STANDARD_LOBS, parseExperienceCsv, downloadExperienceTemplate, scopeExternalRows } from '@/pricing/externalData';
+import { fileToCsv, isSpreadsheetFile } from '@/lib/excel';
 import { Progress } from "@/components/ui/progress";
 import { Brain } from "lucide-react";
 import { buildFeatures } from '@/pricing/ai/features';
@@ -201,18 +202,18 @@ const PricingSystem = () => {
     else toast.error("Pop-up blocked — allow pop-ups to export the memo");
   };
 
-  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      toast.error("Import a .csv file — in Excel use File → Save As → CSV");
-      setImportErrors(['Only .csv files are supported. In Excel: File → Save As → CSV (Comma delimited).']);
-      e.target.value = '';
+    if (!isSpreadsheetFile(file.name)) {
+      toast.error("Import a .xlsx, .xls or .csv file");
+      setImportErrors(['Supported formats: Excel (.xlsx, .xls) or CSV.']);
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = parseExperienceCsv(String(reader.result ?? ''));
+    try {
+      const csv = await fileToCsv(file);
+      const result = parseExperienceCsv(csv);
       setImportErrors(result.errors);
       if (result.rows.length === 0) {
         toast.error("No valid rows found — check the column headers against the template");
@@ -223,9 +224,9 @@ const PricingSystem = () => {
         );
         toast.success(`${result.rows.length} experience rows imported from ${file.name}${result.skipped > 0 ? ` (${result.skipped} skipped)` : ''} — pricing recomputed`);
       }
-      e.target.value = '';
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      toast.error(`Could not read ${file.name}: ${String(err)}`);
+    }
   };
 
   const typeHelp: Record<PricingTreatyType, string> = {
@@ -495,13 +496,13 @@ const PricingSystem = () => {
             <CardHeader>
               <CardTitle>Historical Experience Import</CardTitle>
               <CardDescription>
-                Bring past premium and claims data into the pricing evidence — from Excel use File → Save As → CSV.
+                Bring past premium and claims data into the pricing evidence — Excel (.xlsx) or CSV accepted directly.
                 Columns: Year, Cedant, Contract Number, Line of Business, Premium, Losses, Claim Count (Year and Premium required).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap items-center gap-3">
-                <Input type="file" accept=".csv" onChange={handleImportFile} className="max-w-xs" />
+                <Input type="file" accept=".csv,.xlsx,.xls" onChange={handleImportFile} className="max-w-xs" />
                 <Button size="sm" variant="outline" onClick={downloadExperienceTemplate}>
                   <Download className="h-3 w-3 mr-1" />
                   Download Template

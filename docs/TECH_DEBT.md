@@ -21,14 +21,14 @@ None of these block current functionality; they matter for productionisation.
 | 25 | Retro recovery reserve = outstanding × (1 + IBNR/incurred ratio) — a proxy, not a per-layer actuarial projection | `retrocession/recoveryEngine.ts` |
 | 26 | Exposure uses premium + incurred claims as the gross-exposure proxy (no sum-insured data exists) | `retrocession/analytics.ts` |
 | 27 | PML = MPL × 0.65 fixed factor — placeholder until modelled | `retrocession/analytics.ts` |
-| 28 | Legacy `treaty.retroPercentage` still drives IFRS 17 Reinsurance Held; programme-based cession supersedes it only in accounting journals | `ifrs17/financialStatements.ts`, `accounting/journals.ts` |
+| 28 | ~~IFRS 17 Reinsurance Held on legacy retroPercentage~~ **Resolved (Stage 8)** — programme basis applies in IFRS 17 whenever programmes exist | `ifrs17/financialStatements.ts` |
 | 29 | Surplus retro uses an estimated average cession % — true surplus cession varies per risk with sum insured, which doesn't exist in the data model | `retrocession/recoveryEngine.ts` |
-| 30 | Reinstatement terms on XOL/Cat retro are captured and displayed but reinstatement premiums on retro recoveries are not yet auto-booked | `retrocession/recoveryEngine.ts` |
+| 30 | ~~Reinstatement premiums not auto-booked~~ **Resolved (Stage 8)** — `JN-RIP-*` journal on XOL/Cat recovery settlement | `accounting/journals.ts` |
 | 31 | ~~Pricing metrics illustrative~~ **Resolved in Stage 6A** — item 13 superseded; all pricing computes from live data | `PricingSystem.tsx` |
 | 32 | Exposure rating uses a one-parameter power curve on an MPL proxy, not market exposure curves (no per-risk sum-insured profile) | `pricing/exposureRating.ts` |
 | 33 | Stop-loss exposure rating is a deterministic excess over the ELR — no aggregate loss distribution/volatility model | `pricing/exposureRating.ts` |
 | 34 | Surplus pricing relies on a user-estimated ceded share (same per-risk data gap as #29) | `pricing/treatyPricing.ts` |
-| 35 | Experience import accepts CSV only — native .xlsx parsing needs a library (SheetJS); Excel users must Save As CSV | `pricing/externalData.ts` |
+| 35 | ~~CSV-only import~~ **Resolved (Stage 8)** — SheetJS: .xlsx/.xls imports and real .xlsx analysis exports | `lib/excel.ts` |
 | 36 | Imported aggregate losses are exploded at average severity per year/row — individual large losses in imports are smoothed, understating XOL layer costs for skewed years | `pricing/externalData.ts` |
 | 37 | AI layer is heuristic, not trained — weights are expert-set constants; the Model Registry documents the intended backend ML replacements | `pricing/ai/models.ts` |
 | 38 | Risk appetite limits (LR ≤ 80%, concentration ≤ 60%, etc.) are hardcoded rules, not user-configurable appetite statements | `pricing/ai/models.ts` |
@@ -66,7 +66,7 @@ keep that transparency when extending them.
 | 18 | **Bundle > 500 kB** (single chunk, ~640 kB JS) | Build warns; no code-splitting/lazy routes |
 | 19 | **Two toast systems** mounted (shadcn `Toaster` + `sonner`); only sonner is used | Minor; standardise on sonner |
 | 20 | **Unused installed deps** — `react-hook-form`, `zod`, `@tanstack/react-query` present but feature code doesn't use them | Forms are hand-controlled |
-| 21 | **No automated tests** | The pure calc libraries (`lib/actuarial.ts`, `ifrs17/*`) are ideal unit-test targets but untested |
+| 21 | ~~No automated tests~~ **Resolved (Stage 8)** — Vitest, 62 tests over all engine libraries (`npm test`) | `src/test/` |
 | 22 | Line-ending warnings (LF→CRLF) on Windows checkouts | Harmless; consider a `.gitattributes` |
 
 ## Suggested cleanup order

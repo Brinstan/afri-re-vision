@@ -1,8 +1,9 @@
 // Draft IFRS 17 financial statements and reinsurance issued/held summaries,
 // derived from the LRC/LIC roll-forwards and live treaty/claim data.
 
-import type { Claim, Treaty } from '@/components/DataStore';
+import type { Claim, Treaty, RetroProgramme, RetroClaim } from '@/components/DataStore';
 import { claimIncurred, claimPaid } from '@/lib/actuarial';
+import { computeRecoveries } from '@/retrocession/recoveryEngine';
 import {
   FinancialStatements, Ifrs17Assumptions, LicRollForward, LrcRollForward,
   PortfolioPerformanceRow, ReinsuranceHeld, ReinsuranceIssued
@@ -34,7 +35,31 @@ export const reinsuranceIssued = (
   };
 };
 
-export const reinsuranceHeld = (treaties: Treaty[], claims: Claim[], assumptions: Ifrs17Assumptions): ReinsuranceHeld => {
+/**
+ * Reinsurance Held. When retro programmes exist they are the source of truth
+ * (same rule as the accounting engine, DECISIONS D-010): ceded premium comes
+ * from programme layer premiums earned over the programme period, and
+ * recoveries from the type-aware recovery engine. The legacy per-treaty
+ * retroPercentage basis applies only when no programmes are defined —
+ * closing the G-08 inconsistency between IFRS 17 and accounting.
+ */
+export const reinsuranceHeld = (
+  treaties: Treaty[],
+  claims: Claim[],
+  assumptions: Ifrs17Assumptions,
+  retroProgrammes: RetroProgramme[] = [],
+  retroClaims: RetroClaim[] = []
+): ReinsuranceHeld => {
+  if (retroProgrammes.length > 0) {
+    const cededPremium = retroProgrammes.reduce((s, p) => {
+      const asTreatyPeriod = { inceptionDate: p.effectiveDate, expiryDate: p.expiryDate } as Treaty;
+      const earned = earnedFraction(asTreatyPeriod, assumptions.valuationDate);
+      return s + p.layers.reduce((ls, l) => ls + l.premium, 0) * earned;
+    }, 0);
+    const rows = computeRecoveries(claims, treaties, retroProgrammes, retroClaims, 0);
+    const recoveries = rows.reduce((s, r) => s + r.expectedRecovery, 0);
+    return { cededPremium, recoveries, netRetroCost: cededPremium - recoveries };
+  }
   const cededPremium = treaties.reduce(
     (s, t) => s + t.premium * (t.retroPercentage / 100) * earnedFraction(t, assumptions.valuationDate), 0);
   const recoveries = claims.reduce((s, c) => s + (c.retroRecovery ?? 0), 0);

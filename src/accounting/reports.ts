@@ -2,6 +2,7 @@
 // print-to-PDF management report.
 
 import { downloadFile } from '@/lib/actuarial';
+import { downloadCsvAsXlsx } from '@/lib/excel';
 import { StatementLine, StatementsBundle } from './financialStatements';
 import { LedgerEntry, TrialBalanceRow } from './types';
 
@@ -50,7 +51,7 @@ export const exportFinanceExcel = (
   lines.push('', row('ADJUSTED TRIAL BALANCE'));
   lines.push(row('Code', 'Account', 'Category', 'Debit', 'Credit'));
   tb.forEach(r => lines.push(row(r.accountCode, r.accountName, r.category, Math.round(r.debit), Math.round(r.credit))));
-  downloadFile(lines.join('\n'), `financial-analysis-${stamp()}.csv`);
+  downloadCsvAsXlsx(`financial-analysis-${stamp()}.xlsx`, lines.join('\n'), 'Financial Analysis');
 };
 
 /** Printable management report — the browser print dialog saves as PDF. */

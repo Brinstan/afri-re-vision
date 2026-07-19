@@ -205,6 +205,26 @@ export const deriveJournals = (
       'Retrocession Recovery',
       `Retro recovery settled — ${programme?.programmeCode ?? rc.programmeId}`
     ));
+
+    // 11b) Reinstatement premium due on XOL/Cat recoveries (G-09): the layer
+    // reinstates pro-rata to the amount recovered, at the programme's
+    // reinstatement rate on the layer premium.
+    if (programme && ['XOL', 'Catastrophe'].includes(programme.type) &&
+        (programme.reinstatementsCount ?? 0) > 0 && (programme.reinstatementRatePct ?? 0) > 0) {
+      const layer = programme.layers.find(l => l.id === rc.layerId);
+      if (layer && layer.limit > 0 && layer.premium > 0) {
+        const proRata = Math.min(1, rc.settledRecovery / layer.limit);
+        const reinstatement = layer.premium * proRata * (programme.reinstatementRatePct! / 100);
+        if (reinstatement > 0) {
+          journals.push(journal(
+            `JN-RIP-${rc.id}`, rc.settlementDate ?? rc.notificationDate, rc.id, programme.currency,
+            [line('5200', reinstatement, 0), line('2200', 0, reinstatement)],
+            'Retrocession Premium',
+            `Reinstatement premium ${programme.reinstatementRatePct}% pro-rata on ${layer.name} — ${programme.programmeCode}`
+          ));
+        }
+      }
+    }
   });
 
   // 12) IFRS/actuarial adjustment: IBNR provision (adjusted TB only)

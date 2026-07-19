@@ -32,7 +32,7 @@ const fmtM = (n: number) => `${(n / 1_000_000).toFixed(2)}M`;
 const ACTUARIAL_KEY = 'afrirevision-actuarial-assumptions';
 
 const IfrsReporting = () => {
-  const { treaties, claims } = useDataStore();
+  const { treaties, claims, retroProgrammes, retroClaims } = useDataStore();
 
   const [assumptions, setAssumptions] = useState<Ifrs17Assumptions>(loadAssumptions);
   const [filters, setFilters] = useState<Ifrs17Filters>(ALL_FILTERS);
@@ -112,7 +112,8 @@ const IfrsReporting = () => {
     [filteredTreaties, filteredClaims, assumptions, actuarialAssumptions.expectedLossRatio, totalIbnr]);
 
   const issued = useMemo(() => reinsuranceIssued(filteredTreaties, filteredClaims, assumptions), [filteredTreaties, filteredClaims, assumptions]);
-  const held = useMemo(() => reinsuranceHeld(filteredTreaties, filteredClaims, assumptions), [filteredTreaties, filteredClaims, assumptions]);
+  const held = useMemo(() => reinsuranceHeld(filteredTreaties, filteredClaims, assumptions, retroProgrammes, retroClaims),
+    [filteredTreaties, filteredClaims, assumptions, retroProgrammes, retroClaims]);
   const statements = useMemo(() => financialStatements(issued, held, licTotal.closingBalance, licTotal.riskAdjustment, assumptions),
     [issued, held, licTotal, assumptions]);
 

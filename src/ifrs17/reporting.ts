@@ -2,6 +2,7 @@
 // analysis files, and a printable (print-to-PDF) management report.
 
 import { downloadFile } from '@/lib/actuarial';
+import { downloadCsvAsXlsx } from '@/lib/excel';
 import {
   FinancialStatements, FulfilmentCashFlows, Ifrs17Assumptions,
   LicRollForward, LrcRollForward, PortfolioPerformanceRow,
@@ -57,7 +58,7 @@ export const exportAnalysisExcel = (
   lines.push('', row('PORTFOLIO PERFORMANCE'));
   lines.push(row('Group', 'Premium', 'Revenue', 'Claims', 'Expenses', 'Result', 'Loss Ratio %'));
   performance.forEach(p => lines.push(row(p.key, Math.round(p.premium), Math.round(p.revenue), Math.round(p.claimsIncurred), Math.round(p.expenses), Math.round(p.result), p.lossRatio === null ? '' : p.lossRatio.toFixed(1))));
-  downloadFile(lines.join('\n'), `ifrs17-analysis-${new Date().toISOString().split('T')[0]}.csv`);
+  downloadCsvAsXlsx(`ifrs17-analysis-${new Date().toISOString().split('T')[0]}.xlsx`, lines.join('\n'), 'IFRS 17 Analysis');
 };
 
 /** Printable management report — the browser print dialog saves it as PDF. */
